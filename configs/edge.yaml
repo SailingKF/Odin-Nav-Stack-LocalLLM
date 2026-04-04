@@ -3,6 +3,11 @@ pose_provider_type: odin_ros
 narrator_type: local_llm
 narration_mode_default: standard
 llm_gateway_url: http://127.0.0.1:9000
+llm_backend_type: ollama
+llm_model_name: gemma-local
+llm_base_url: http://127.0.0.1:11434
+llm_timeout_sec: 12.0
+llm_enable_fallback: true
 session_log_dir: session_logs/edge
 recording_enabled: false
 current_route_file: content/routes/demo_route.yaml

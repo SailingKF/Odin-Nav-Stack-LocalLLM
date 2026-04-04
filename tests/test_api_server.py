@@ -10,6 +10,15 @@ from services.api_server.runtime import MockTourApiRuntime
 
 
 class ApiServerTests(unittest.TestCase):
+    @staticmethod
+    def _wait_until_runtime_stops(runtime: MockTourApiRuntime, timeout_seconds: float = 3.0) -> None:
+        deadline = time.time() + timeout_seconds
+        while time.time() < deadline:
+            state = runtime.state()
+            if not state.get("is_running"):
+                break
+            time.sleep(0.05)
+
     def setUp(self) -> None:
         self._temp_dir = tempfile.TemporaryDirectory()
         session_dir = Path(self._temp_dir.name) / "session_logs" / "dev_api_test"
@@ -19,6 +28,11 @@ class ApiServerTests(unittest.TestCase):
             "narrator_type": "mock",
             "narration_mode_default": "standard",
             "llm_gateway_url": "http://127.0.0.1:9000",
+            "llm_backend_type": "mock",
+            "llm_model_name": "mock-curated-content",
+            "llm_base_url": "http://127.0.0.1:11434",
+            "llm_timeout_sec": 8.0,
+            "llm_enable_fallback": True,
             "session_log_dir": str(session_dir),
             "recording_enabled": False,
             "current_route_file": "content/routes/demo_route.yaml",
@@ -28,12 +42,7 @@ class ApiServerTests(unittest.TestCase):
         self.client = TestClient(create_app(runtime=self.runtime))
 
     def tearDown(self) -> None:
-        deadline = time.time() + 3.0
-        while time.time() < deadline:
-            state = self.runtime.state()
-            if not state.get("is_running"):
-                break
-            time.sleep(0.05)
+        self._wait_until_runtime_stops(self.runtime)
         self._temp_dir.cleanup()
 
     def test_health_and_state(self) -> None:
@@ -99,6 +108,40 @@ class ApiServerTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertIn("answer_text", payload)
         self.assertIn("state", payload)
+
+    def test_question_endpoint_in_local_llm_mode_falls_back_cleanly(self) -> None:
+        session_dir = Path(self._temp_dir.name) / "session_logs" / "dev_api_local_llm_test"
+        config = {
+            "env_name": "dev",
+            "pose_provider_type": "mock",
+            "narrator_type": "local_llm",
+            "narration_mode_default": "standard",
+            "llm_gateway_url": "http://127.0.0.1:65500",
+            "llm_backend_type": "ollama",
+            "llm_model_name": "gemma-local",
+            "llm_base_url": "http://127.0.0.1:11434",
+            "llm_timeout_sec": 0.2,
+            "llm_enable_fallback": True,
+            "session_log_dir": str(session_dir),
+            "recording_enabled": False,
+            "current_route_file": "content/routes/demo_route.yaml",
+            "current_poi_file": "content/poi/demo_pois.yaml",
+        }
+        runtime = MockTourApiRuntime(config=config, repo_root=REPO_ROOT, step_interval_seconds=0.02)
+        client = TestClient(create_app(runtime=runtime))
+
+        try:
+            client.post("/tour/start")
+            time.sleep(0.25)
+            response = client.post("/tour/question", json={"question": "Why does the tour start here?"})
+
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+            self.assertTrue(payload["ok"])
+            self.assertIn("answer_text", payload)
+            self.assertIn("first stop", payload["answer_text"])
+        finally:
+            self._wait_until_runtime_stops(runtime)
 
 
 if __name__ == "__main__":

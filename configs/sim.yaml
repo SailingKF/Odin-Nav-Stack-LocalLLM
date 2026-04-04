@@ -3,6 +3,11 @@ pose_provider_type: isaac_sim
 narrator_type: mock
 narration_mode_default: standard
 llm_gateway_url: http://127.0.0.1:9000
+llm_backend_type: mock
+llm_model_name: gemma-local
+llm_base_url: http://127.0.0.1:11434
+llm_timeout_sec: 8.0
+llm_enable_fallback: true
 session_log_dir: session_logs/sim
 recording_enabled: false
 current_route_file: content/routes/demo_route.yaml

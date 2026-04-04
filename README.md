@@ -233,6 +233,66 @@ Current limitations:
 - no conversation memory beyond the active or last narrated POI
 - no hardware adapters or simulator-specific narrator tuning yet
 
+## Local LLM Gateway Backends
+
+The local LLM gateway now supports two backend modes:
+- `mock`
+- `ollama`
+
+Gateway health now reports:
+- gateway status
+- configured backend type
+- active backend type
+- model name
+- fallback enabled / active state
+
+Relevant config fields:
+- `llm_backend_type`
+- `llm_model_name`
+- `llm_base_url`
+- `llm_timeout_sec`
+- `llm_enable_fallback`
+- `llm_gateway_url`
+
+Recommended development flow:
+1. keep `narrator_type: mock` for the safest default
+2. start the gateway in `mock` backend mode for API validation
+3. switch `narrator_type: local_llm` when you want the API server to call the gateway
+4. switch `llm_backend_type: ollama` when a local Ollama runtime and a local Gemma model are available
+
+Example gateway startup:
+```shell
+python scripts/run_llm_gateway.py --config configs/dev.yaml
+```
+
+Example local-LLM oriented config:
+```yaml
+narrator_type: local_llm
+llm_gateway_url: http://127.0.0.1:9000
+llm_backend_type: ollama
+llm_model_name: gemma-local
+llm_base_url: http://127.0.0.1:11434
+llm_timeout_sec: 8.0
+llm_enable_fallback: true
+```
+
+How real local model integration works:
+- `LocalLLMNarrator` calls the HTTP gateway
+- the gateway chooses the configured backend adapter
+- the `ollama` backend builds a constrained prompt from structured POI content
+- the prompt is sent to the local Ollama HTTP API
+- if the backend is unavailable and fallback is enabled, the gateway or narrator falls back to mock behavior
+
+Prompting approach:
+- narration uses POI name, mode, short/standard/extended text, facts, tags, persona, and theme
+- follow-up answers use the current POI FAQ, facts, and base text
+- prompts explicitly tell the model to stay within the supplied content
+
+Ollama / Gemma note:
+- this repository does not hardcode one exact Gemma runtime tag
+- set `llm_model_name` to the model tag that exists in your local runtime
+- if Ollama is not installed or the model is missing, `/health` will report a degraded state and fallback can keep the route alive
+
 # Quick Start
 
 The code has been tested on:

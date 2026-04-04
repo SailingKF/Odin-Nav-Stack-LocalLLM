@@ -13,10 +13,12 @@ class LocalLLMNarrator(Narrator):
         self,
         gateway_url: Optional[str] = None,
         timeout_seconds: float = 5.0,
+        fallback_enabled: bool = True,
         fallback_narrator: Optional[Narrator] = None,
     ) -> None:
         self._gateway_url = gateway_url.rstrip("/") if gateway_url else None
         self._timeout_seconds = timeout_seconds
+        self._fallback_enabled = fallback_enabled
         self._fallback_narrator = fallback_narrator or MockNarrator()
 
     def _post_json(self, path: str, payload: dict) -> dict:
@@ -40,6 +42,8 @@ class LocalLLMNarrator(Narrator):
             )
             return str(payload["narration_text"])
         except Exception:
+            if not self._fallback_enabled:
+                raise
             return self._fallback_narrator.generate_narration(spot, mode)
 
     def answer_question(self, spot: POI, question: str) -> str:
@@ -50,4 +54,6 @@ class LocalLLMNarrator(Narrator):
             )
             return str(payload["answer_text"])
         except Exception:
+            if not self._fallback_enabled:
+                raise
             return self._fallback_narrator.answer_question(spot, question)

@@ -12,12 +12,13 @@ from services.llm_gateway.app import create_app
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run the local LLM gateway scaffold.")
+    parser = argparse.ArgumentParser(description="Run the local LLM gateway.")
+    parser.add_argument("--config", default=str(REPO_ROOT / "configs" / "dev.yaml"), help="Config file to load.")
     parser.add_argument("--host", default="0.0.0.0", help="Bind host.")
     parser.add_argument("--port", type=int, default=9000, help="Bind port.")
     args = parser.parse_args()
 
-    uvicorn.run(create_app(), host=args.host, port=args.port, log_level="info")
+    uvicorn.run(create_app(config_path=Path(args.config)), host=args.host, port=args.port, log_level="info")
     return 0
 
 
