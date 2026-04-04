@@ -1,0 +1,5 @@
+route_id: demo_route
+spot_ids:
+  - gate
+  - plaza
+  - gallery

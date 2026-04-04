@@ -1,0 +1,9 @@
+from enum import Enum
+
+
+class TourState(str, Enum):
+    IDLE = "IDLE"
+    NAVIGATING = "NAVIGATING"
+    ARRIVED_POI = "ARRIVED_POI"
+    PLAYING_NARRATION = "PLAYING_NARRATION"
+    CONTINUE_ROUTE = "CONTINUE_ROUTE"

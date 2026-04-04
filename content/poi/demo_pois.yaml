@@ -1,0 +1,19 @@
+pois:
+  - spot_id: gate
+    name: East Gate
+    x: 0.0
+    y: 0.0
+    trigger_radius: 1.2
+    narration_text: "Welcome to the East Gate. This is the opening stop for the mock guided tour."
+  - spot_id: plaza
+    name: Central Plaza
+    x: 5.0
+    y: 1.0
+    trigger_radius: 1.0
+    narration_text: "This central plaza is our shared activity area and a good checkpoint for route validation."
+  - spot_id: gallery
+    name: History Gallery
+    x: 9.5
+    y: -0.5
+    trigger_radius: 1.1
+    narration_text: "The history gallery stop proves that the mock adapter can continue through multiple POIs without duplicate triggers."

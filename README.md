@@ -51,6 +51,35 @@ Foundation docs for this extension live in [`docs/`](docs/):
 - [DEPLOYMENT](docs/DEPLOYMENT.md)
 - [AGENT](docs/AGENT.md)
 
+## Mock Tour Foundation
+
+This iteration adds a laptop-first mock tour skeleton without depending on Odin hardware, Isaac Sim, Android UI, or a real LLM runtime.
+
+What is included:
+- lightweight environment configs in `configs/`
+- platform-neutral core interfaces in `core/interfaces/`
+- POI loading and trigger logic in `core/poi/`
+- a minimal tour state machine in `core/tour_orchestrator/`
+- JSONL session logging in `core/session/`
+- a mock pose adapter and runnable demo script in `adapters/mock/` and `scripts/run_mock_tour.py`
+
+How to run:
+```shell
+python scripts/run_mock_tour.py
+python -m unittest discover -s tests
+```
+
+Current limitations:
+- narration is printed only, with no TTS
+- no Android control surface yet
+- no Isaac Sim, ROS, or Odin pose adapter integration yet
+- no real local LLM, ASR, or video recording pipeline in this bundle
+
+Planned extension path:
+- replace the mock pose provider with Isaac Sim and ROS/Odin adapters through the same interfaces
+- keep the core tour logic unchanged when moving to Orin NX
+- add an Android-friendly backend and UI on top of the same session and orchestrator flow
+
 # Quick Start
 
 The code has been tested on:

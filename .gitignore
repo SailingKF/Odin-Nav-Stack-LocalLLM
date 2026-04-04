@@ -2,3 +2,6 @@
 bags/
 *.bag
 maps/
+session_logs/
+__pycache__/
+*.pyc

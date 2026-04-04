@@ -1,0 +1,6 @@
+env_name: edge
+pose_provider_type: odin_ros
+session_log_dir: session_logs/edge
+recording_enabled: false
+current_route_file: content/routes/demo_route.yaml
+current_poi_file: content/poi/demo_pois.yaml
