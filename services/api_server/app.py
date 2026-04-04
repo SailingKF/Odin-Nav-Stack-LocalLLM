@@ -2,10 +2,13 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from services.api_server.runtime import MockTourApiRuntime
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 
 def create_app(
@@ -18,6 +21,15 @@ def create_app(
         repo_root=REPO_ROOT,
     )
     app.state.runtime = active_runtime
+    app.mount("/debug-assets", StaticFiles(directory=str(STATIC_DIR)), name="debug-assets")
+
+    @app.get("/", include_in_schema=False)
+    def root() -> RedirectResponse:
+        return RedirectResponse(url="/debug", status_code=307)
+
+    @app.get("/debug", include_in_schema=False)
+    def debug_page() -> FileResponse:
+        return FileResponse(STATIC_DIR / "index.html")
 
     @app.get("/health")
     def health() -> dict:

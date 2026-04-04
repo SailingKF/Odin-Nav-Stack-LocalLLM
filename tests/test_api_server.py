@@ -39,6 +39,16 @@ class ApiServerTests(unittest.TestCase):
         self.assertIn("is_running", payload)
         self.assertIn("session_log_path", payload)
 
+    def test_debug_page_is_served_for_mobile_use(self) -> None:
+        response = self.client.get("/debug")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Mock Tour Debug Panel", response.text)
+        self.assertIn('name="viewport"', response.text)
+        self.assertIn("Start Tour", response.text)
+        self.assertIn("Refresh Status", response.text)
+        self.assertIn("http://127.0.0.1:8000", response.text)
+
     def test_control_endpoints_and_latest_session(self) -> None:
         start_response = self.client.post("/tour/start")
         self.assertEqual(start_response.status_code, 200)

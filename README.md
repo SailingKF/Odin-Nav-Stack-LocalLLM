@@ -119,6 +119,43 @@ Current API limitations:
 - there is still no TTS, ASR, real LLM, video recorder, Isaac Sim, or ROS/Odin integration
 - the API provides JSON control and inspection only, not a rendered web page
 
+## Android-Friendly Debug Page
+
+This iteration adds a very thin H5 debug panel in `services/api_server/static/` and serves it from the existing FastAPI process.
+
+What is included:
+- a mobile-friendly page at `/debug`
+- large touch buttons for start, pause, resume, next, and refresh
+- panels for health, current state, route progress, and latest session
+- a configurable API base URL field so Android can target a laptop or Orin NX over LAN
+- optional polling-based auto refresh with no frontend framework or build step
+
+How to start the API and debug page:
+```shell
+python scripts/run_api_server.py
+```
+
+Open the page:
+- local laptop browser: `http://127.0.0.1:8000/debug`
+- Android browser over LAN: `http://<device-ip>:8000/debug`
+
+Android access notes:
+- start the server with the default `0.0.0.0` binding from `scripts/run_api_server.py`
+- find the IP of the laptop or Orin NX on the same network
+- open `http://<that-ip>:8000/debug` on the phone
+- inside the page, either set the API base URL manually or tap `Use Page Origin`
+
+Why this structure fits Orin NX + Android debugging:
+- the page is static HTML/CSS/JS, so it adds almost no runtime complexity
+- the FastAPI backend stays the single integration point
+- there is no heavy frontend toolchain to drag into edge deployment
+- the same page works from desktop and Android browser with only a URL change
+
+Current debug page limitations:
+- it consumes the existing mock-tour API only
+- it uses polling rather than websockets or complex state sync
+- there is still no native Android app, no TTS/ASR, and no real hardware integration
+
 # Quick Start
 
 The code has been tested on:
