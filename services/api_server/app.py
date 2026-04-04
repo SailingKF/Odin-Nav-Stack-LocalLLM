@@ -4,11 +4,16 @@ from typing import Optional
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from services.api_server.runtime import MockTourApiRuntime
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+
+class TourQuestionRequest(BaseModel):
+    question: str
 
 
 def create_app(
@@ -54,6 +59,10 @@ def create_app(
     @app.post("/tour/next")
     def next_poi() -> dict:
         return active_runtime.next_poi()
+
+    @app.post("/tour/question")
+    def ask_question(payload: TourQuestionRequest) -> dict:
+        return active_runtime.ask_question(payload.question)
 
     @app.get("/session/latest")
     def latest_session() -> dict:

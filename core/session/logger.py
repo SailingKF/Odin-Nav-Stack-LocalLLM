@@ -15,6 +15,8 @@ class JsonlSessionStore(SessionStore):
         self._output_path: Optional[Path] = None
         self._event_count = 0
         self._latest_event: Optional[Dict[str, Any]] = None
+        self._latest_narration_text: Optional[str] = None
+        self._latest_answer_text: Optional[str] = None
         self._closed = True
 
     @property
@@ -34,6 +36,8 @@ class JsonlSessionStore(SessionStore):
         self._output_path = self._session_log_dir / f"{self._session_id}.jsonl"
         self._event_count = 0
         self._latest_event = None
+        self._latest_narration_text = None
+        self._latest_answer_text = None
         self._closed = False
         self.append_event("session_started", state="IDLE", extra=metadata or {})
         return self._session_id
@@ -67,6 +71,10 @@ class JsonlSessionStore(SessionStore):
 
         self._event_count += 1
         self._latest_event = payload
+        if event_type == "narration_started" and narration_text:
+            self._latest_narration_text = narration_text
+        if event_type == "question_answered" and narration_text:
+            self._latest_answer_text = narration_text
 
     def close(self) -> None:
         if self._output_path is None or self._closed:
@@ -86,7 +94,8 @@ class JsonlSessionStore(SessionStore):
             "latest_pose": latest.get("pose"),
             "latest_spot_id": latest.get("spot_id"),
             "latest_spot_name": latest.get("spot_name"),
-            "latest_narration_text": latest.get("narration_text"),
+            "latest_narration_text": self._latest_narration_text,
+            "latest_answer_text": self._latest_answer_text,
         }
 
     def get_latest_session_summary(self) -> Dict[str, Any]:
@@ -120,11 +129,20 @@ class JsonlSessionStore(SessionStore):
                 "latest_spot_id": None,
                 "latest_spot_name": None,
                 "latest_narration_text": None,
+                "latest_answer_text": None,
             }
 
         latest_path = files[-1]
         events = cls._load_events(latest_path)
         latest = events[-1] if events else {}
+        latest_narration = next(
+            (item.get("narration_text") for item in reversed(events) if item.get("event_type") == "narration_started" and item.get("narration_text")),
+            None,
+        )
+        latest_answer = next(
+            (item.get("narration_text") for item in reversed(events) if item.get("event_type") == "question_answered" and item.get("narration_text")),
+            None,
+        )
         return {
             "session_id": latest.get("session_id"),
             "session_log_path": str(latest_path),
@@ -134,5 +152,6 @@ class JsonlSessionStore(SessionStore):
             "latest_pose": latest.get("pose"),
             "latest_spot_id": latest.get("spot_id"),
             "latest_spot_name": latest.get("spot_name"),
-            "latest_narration_text": latest.get("narration_text"),
+            "latest_narration_text": latest_narration,
+            "latest_answer_text": latest_answer,
         }

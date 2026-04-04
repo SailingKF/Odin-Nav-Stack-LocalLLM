@@ -2,7 +2,7 @@ import threading
 import time
 from typing import Any, Callable, Dict, List, Optional
 
-from core.interfaces.content_provider import ContentProvider
+from core.interfaces.narrator import Narrator
 from core.interfaces.pose_provider import Pose2D, PoseProvider
 from core.interfaces.session_store import SessionStore
 from core.poi.models import POI
@@ -14,21 +14,23 @@ class TourOrchestrator:
     def __init__(
         self,
         route_pois: List[POI],
-        content_provider: ContentProvider,
+        narrator: Narrator,
         session_store: SessionStore,
         trigger_engine: Optional[PoiTriggerEngine] = None,
         event_callback: Optional[Callable[[str], None]] = None,
         pose_provider: Optional[PoseProvider] = None,
         session_metadata: Optional[Dict[str, Any]] = None,
+        narration_mode_default: str = "standard",
         step_interval_seconds: float = 0.0,
     ) -> None:
         self._route_pois = route_pois
-        self._content_provider = content_provider
+        self._narrator = narrator
         self._session_store = session_store
         self._trigger_engine = trigger_engine or PoiTriggerEngine()
         self._event_callback = event_callback
         self._pose_provider = pose_provider
         self._session_metadata = session_metadata or {}
+        self._narration_mode_default = narration_mode_default
         self._step_interval_seconds = step_interval_seconds
         self._current_index = 0
         self._state = TourState.IDLE
@@ -40,7 +42,9 @@ class TourOrchestrator:
         self._session_started_by_orchestrator = False
         self._last_pose: Optional[Pose2D] = None
         self._last_narration_text: Optional[str] = None
+        self._last_answer_text: Optional[str] = None
         self._last_event_type: Optional[str] = None
+        self._last_focus_poi: Optional[POI] = None
 
     @property
     def state(self) -> TourState:
@@ -73,8 +77,10 @@ class TourOrchestrator:
             extra=extra,
         )
         self._last_event_type = event_type
-        if narration_text is not None:
+        if event_type == "narration_started" and narration_text is not None:
             self._last_narration_text = narration_text
+        if event_type == "question_answered" and narration_text is not None:
+            self._last_answer_text = narration_text
 
     def _transition(self, next_state: TourState, pose: Optional[Pose2D], poi: Optional[POI]) -> None:
         previous_state = self._state
@@ -136,7 +142,9 @@ class TourOrchestrator:
             self._paused = False
             self._completed = False
             self._last_narration_text = None
+            self._last_answer_text = None
             self._last_event_type = "tour_started"
+            self._last_focus_poi = None
             self._current_index = 0
             self._trigger_engine.reset()
             self._state = TourState.IDLE
@@ -205,6 +213,37 @@ class TourOrchestrator:
                 )
             return self.get_state()
 
+    def answer_question(self, question: str) -> Dict[str, Any]:
+        with self._lock:
+            focus_poi = self._last_focus_poi or self._active_poi()
+            if focus_poi is None:
+                answer_text = "No active or previously narrated POI is available for follow-up questions yet."
+                return {
+                    "question": question,
+                    "answer_text": answer_text,
+                    "spot_id": None,
+                    "spot_name": None,
+                    "state": self.get_state(),
+                }
+
+            answer_text = self._narrator.answer_question(focus_poi, question)
+            self._append_event(
+                event_type="question_answered",
+                pose=self._last_pose,
+                poi=focus_poi,
+                state=self._state.value,
+                narration_text=answer_text,
+                extra={"question": question},
+            )
+            self._emit(f"[ANSWER] {focus_poi.name}: {answer_text}")
+            return {
+                "question": question,
+                "answer_text": answer_text,
+                "spot_id": focus_poi.spot_id,
+                "spot_name": focus_poi.name,
+                "state": self.get_state(),
+            }
+
     def get_state(self) -> Dict[str, Any]:
         active_poi = self._active_poi()
         session_id = getattr(self._session_store, "session_id", None)
@@ -222,11 +261,14 @@ class TourOrchestrator:
             "route_length": len(self._route_pois),
             "active_spot_id": None if active_poi is None else active_poi.spot_id,
             "active_spot_name": None if active_poi is None else active_poi.name,
+            "narrator_type": type(self._narrator).__name__,
+            "narration_mode_default": self._narration_mode_default,
             "last_pose": None
             if self._last_pose is None
             else {"x": self._last_pose.x, "y": self._last_pose.y, "label": self._last_pose.label},
             "last_event_type": self._last_event_type,
             "last_narration_text": self._last_narration_text,
+            "last_answer_text": self._last_answer_text,
             "session_log_path": None if output_path is None else str(output_path),
         }
 
@@ -245,6 +287,7 @@ class TourOrchestrator:
             "latest_spot_id": None if self._active_poi() is None else self._active_poi().spot_id,
             "latest_spot_name": None if self._active_poi() is None else self._active_poi().name,
             "latest_narration_text": self._last_narration_text,
+            "latest_answer_text": self._last_answer_text,
         }
 
     def handle_pose(self, pose: Pose2D) -> None:
@@ -278,7 +321,8 @@ class TourOrchestrator:
                 state=self._state.value,
             )
 
-            narration_text = self._content_provider.get_narration_text(active_poi.spot_id)
+            narration_text = self._narrator.generate_narration(active_poi, self._narration_mode_default)
+            self._last_focus_poi = active_poi
             self._transition(TourState.PLAYING_NARRATION, pose, active_poi)
             self._append_event(
                 event_type="narration_started",
@@ -286,6 +330,7 @@ class TourOrchestrator:
                 poi=active_poi,
                 state=self._state.value,
                 narration_text=narration_text,
+                extra={"mode": self._narration_mode_default},
             )
             self._emit(f"[NARRATION] {active_poi.name}: {narration_text}")
 

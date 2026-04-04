@@ -20,7 +20,14 @@ class PoiLogicTests(unittest.TestCase):
                         "    x: 1.0",
                         "    y: 2.0",
                         "    trigger_radius: 1.5",
-                        "    narration_text: Lobby intro",
+                        "    short_text: Lobby short",
+                        "    standard_text: Lobby standard",
+                        "    extended_text: Lobby extended",
+                        "    facts:",
+                        "      - Lobby fact one",
+                        "    faq:",
+                        "      - question: What is here?",
+                        "        answer: The main lobby is here.",
                     ]
                 ),
                 encoding="utf-8",
@@ -31,6 +38,11 @@ class PoiLogicTests(unittest.TestCase):
         self.assertEqual(len(pois), 1)
         self.assertEqual(pois[0].spot_id, "lobby")
         self.assertEqual(pois[0].trigger_radius, 1.5)
+        self.assertEqual(pois[0].short_text, "Lobby short")
+        self.assertEqual(pois[0].standard_text, "Lobby standard")
+        self.assertEqual(pois[0].extended_text, "Lobby extended")
+        self.assertEqual(pois[0].facts[0], "Lobby fact one")
+        self.assertEqual(pois[0].faq[0].answer, "The main lobby is here.")
 
     def test_radius_trigger(self) -> None:
         poi = load_pois("content/poi/demo_pois.yaml")[0]

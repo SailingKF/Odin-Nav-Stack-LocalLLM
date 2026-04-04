@@ -156,6 +156,83 @@ Current debug page limitations:
 - it uses polling rather than websockets or complex state sync
 - there is still no native Android app, no TTS/ASR, and no real hardware integration
 
+## Structured Content And Narrator Layer
+
+This iteration upgrades the narration path from a single fixed `narration_text` field to a structured POI content library plus a narrator abstraction.
+
+Structured POI content now includes:
+- `spot_id`
+- `name`
+- `x`
+- `y`
+- `trigger_radius`
+- `short_text`
+- `standard_text`
+- `extended_text`
+- `facts`
+- `faq`
+- optional `tags`
+- optional `persona`
+- optional `theme`
+
+The narrator abstraction lives in `core/interfaces/narrator.py` and is implemented by:
+- `core/narrator/mock_narrator.py`
+- `core/narrator/local_llm_narrator.py`
+
+How narrator modes work:
+- `short`: brief mobile-friendly summary
+- `standard`: default guided explanation
+- `extended`: longer explanation with richer detail and facts
+
+Configuration knobs:
+- `narrator_type: mock | local_llm`
+- `narration_mode_default: short | standard | extended`
+- `llm_gateway_url: http://127.0.0.1:9000`
+
+Mode switching examples:
+```yaml
+narrator_type: mock
+narration_mode_default: standard
+```
+
+```yaml
+narrator_type: local_llm
+narration_mode_default: extended
+llm_gateway_url: http://127.0.0.1:9000
+```
+
+Current LocalLLMNarrator status:
+- it is a lightweight client abstraction, not a heavy model runtime
+- it can call a local HTTP gateway through `llm_gateway_url`
+- if the gateway is unavailable, it falls back to `MockNarrator`
+
+Local gateway scaffold:
+- `services/llm_gateway/app.py`
+- `scripts/run_llm_gateway.py`
+
+Run the local gateway scaffold:
+```shell
+python scripts/run_llm_gateway.py
+```
+
+Why this structure fits future Gemma 4 and Orin NX:
+- the orchestrator no longer knows how narration is produced
+- structured content remains the source of truth
+- the mock narrator is enough for laptop and API/debug validation
+- the LocalLLMNarrator can point to a lightweight on-device Gemma 4 service later
+- the LLM runtime can evolve independently from the core tour flow
+
+API/debug page additions in this round:
+- state now exposes narrator type, narration mode, current narration text, and latest answer text
+- `POST /tour/question` supports minimal follow-up Q&A
+- `/debug` now includes a small question box and answer panel
+
+Current limitations:
+- the local LLM path is still scaffold-level and uses a mock backend by default
+- no TTS/ASR or spoken interaction yet
+- no conversation memory beyond the active or last narrated POI
+- no hardware adapters or simulator-specific narrator tuning yet
+
 # Quick Start
 
 The code has been tested on:

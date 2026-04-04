@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 import yaml
 
 from adapters.mock.mock_pose_provider import MockPoseProvider
+from core.narrator.factory import build_narrator
 from core.poi.loader import load_pois, load_route
 from core.poi.store import InMemoryPoiStore
 from core.session.logger import JsonlSessionStore
@@ -44,10 +45,11 @@ class MockTourApiRuntime:
         route_pois = poi_store.route_pois(route)
         pose_provider = MockPoseProvider.from_route_pois(route_pois)
         session_store = JsonlSessionStore(str(self._session_log_dir))
+        narrator = build_narrator(self._config)
 
         return TourOrchestrator(
             route_pois=route_pois,
-            content_provider=poi_store,
+            narrator=narrator,
             session_store=session_store,
             pose_provider=pose_provider,
             session_metadata={
@@ -56,8 +58,10 @@ class MockTourApiRuntime:
                 "route_id": route.route_id,
                 "recording_enabled": bool(self._config["recording_enabled"]),
                 "control_mode": "api",
+                "narrator_type": self._config.get("narrator_type", "mock"),
             },
             event_callback=print,
+            narration_mode_default=str(self._config.get("narration_mode_default", "standard")),
             step_interval_seconds=self._step_interval_seconds,
         )
 
@@ -67,6 +71,7 @@ class MockTourApiRuntime:
             "service": "mock-tour-api",
             "env_name": self._config["env_name"],
             "pose_provider_type": self._config["pose_provider_type"],
+            "narrator_type": self._config.get("narrator_type", "mock"),
         }
 
     def state(self) -> Dict[str, Any]:
@@ -81,9 +86,12 @@ class MockTourApiRuntime:
                 "route_length": 0,
                 "active_spot_id": None,
                 "active_spot_name": None,
+                "narrator_type": self._config.get("narrator_type", "mock"),
+                "narration_mode_default": self._config.get("narration_mode_default", "standard"),
                 "last_pose": None,
                 "last_event_type": None,
                 "last_narration_text": None,
+                "last_answer_text": None,
                 "session_log_path": None,
             }
         return self._orchestrator.get_state()
@@ -118,3 +126,21 @@ class MockTourApiRuntime:
         if self._orchestrator is not None:
             return self._orchestrator.get_latest_session_summary()
         return JsonlSessionStore.read_latest_session_summary(self._session_log_dir)
+
+    def ask_question(self, question: str) -> Dict[str, Any]:
+        if self._orchestrator is None:
+            return {
+                "ok": False,
+                "action": "question",
+                "message": "no active tour",
+                "question": question,
+                "answer_text": "Start a tour before asking follow-up questions.",
+                "state": self.state(),
+            }
+        response = self._orchestrator.answer_question(question)
+        return {
+            "ok": True,
+            "action": "question",
+            "message": "question answered",
+            **response,
+        }

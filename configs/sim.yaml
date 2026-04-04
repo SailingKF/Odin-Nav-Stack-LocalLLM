@@ -1,5 +1,8 @@
 env_name: sim
 pose_provider_type: isaac_sim
+narrator_type: mock
+narration_mode_default: standard
+llm_gateway_url: http://127.0.0.1:9000
 session_log_dir: session_logs/sim
 recording_enabled: false
 current_route_file: content/routes/demo_route.yaml

@@ -107,6 +107,24 @@
       font-size: 1rem;
     }
 
+    input[type="text"],
+    textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--panel-strong);
+      color: var(--text);
+      font-size: 1rem;
+      font-family: inherit;
+    }
+
+    textarea {
+      min-height: 92px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+
     .hint {
       margin: 0;
       color: var(--muted);
@@ -284,6 +302,18 @@
         <div id="statePanel" class="kv"></div>
       </section>
 
+      <section class="card stack">
+        <h2>Follow-up Question</h2>
+        <div>
+          <label class="label" for="questionInput">Ask About Current Or Last Narrated POI</label>
+          <textarea id="questionInput" placeholder="Example: Why is this stop important?"></textarea>
+        </div>
+        <div class="row">
+          <button id="askQuestion" type="button">Ask Question</button>
+        </div>
+        <div id="answerPanel" class="kv"></div>
+      </section>
+
       <section class="card">
         <h2>Latest Session</h2>
         <div id="sessionPanel" class="kv"></div>
@@ -301,6 +331,8 @@
       healthPanel: document.getElementById("healthPanel"),
       statePanel: document.getElementById("statePanel"),
       sessionPanel: document.getElementById("sessionPanel"),
+      answerPanel: document.getElementById("answerPanel"),
+      questionInput: document.getElementById("questionInput"),
     };
 
     let autoRefreshHandle = null;
@@ -372,10 +404,11 @@
       });
     }
 
-    async function callApi(path, method = "GET") {
+    async function callApi(path, method = "GET", body = null) {
       const response = await fetch(`${getBaseUrl()}${path}`, {
         method,
         headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : null,
       });
       if (!response.ok) {
         const text = await response.text();
@@ -391,6 +424,7 @@
         ["Service", health.service],
         ["Environment", health.env_name],
         ["Pose Provider", health.pose_provider_type],
+        ["Narrator", health.narrator_type],
       ]);
     }
 
@@ -406,6 +440,10 @@
         ["Route Completed", state.route_completed],
         ["Active Spot", state.active_spot_name || state.active_spot_id],
         ["Route Progress", progress],
+        ["Narrator", state.narrator_type],
+        ["Narration Mode", state.narration_mode_default],
+        ["Narration", state.last_narration_text],
+        ["Last Answer", state.last_answer_text],
         ["Session ID", state.session_id],
         ["Last Event", state.last_event_type],
         ["Last Pose", state.last_pose],
@@ -423,6 +461,7 @@
         ["Event Count", session.event_count],
         ["Latest Pose", session.latest_pose],
         ["Narration", session.latest_narration_text],
+        ["Latest Answer", session.latest_answer_text],
         ["Session Log", session.session_log_path],
       ]);
     }
@@ -446,6 +485,27 @@
       }
     }
 
+    async function askQuestion() {
+      const question = elements.questionInput.value.trim();
+      if (!question) {
+        setFeedback("Enter a follow-up question first.", true);
+        return;
+      }
+
+      try {
+        const payload = await callApi("/tour/question", "POST", { question });
+        renderKeyValue(elements.answerPanel, [
+          ["Question", payload.question],
+          ["Spot", payload.spot_name || payload.spot_id],
+          ["Answer", payload.answer_text],
+        ]);
+        setFeedback(payload.message || "Question answered", false);
+        await refreshAll();
+      } catch (error) {
+        setFeedback(`Question failed: ${error.message}`, true);
+      }
+    }
+
     function updateAutoRefresh() {
       if (autoRefreshHandle !== null) {
         window.clearInterval(autoRefreshHandle);
@@ -462,6 +522,7 @@
 
     document.getElementById("refreshStatus").addEventListener("click", refreshAll);
     document.getElementById("refreshAll").addEventListener("click", refreshAll);
+    document.getElementById("askQuestion").addEventListener("click", askQuestion);
     document.getElementById("saveBaseUrl").addEventListener("click", saveBaseUrl);
     document.getElementById("usePageOrigin").addEventListener("click", usePageOrigin);
     elements.autoRefresh.addEventListener("change", updateAutoRefresh);

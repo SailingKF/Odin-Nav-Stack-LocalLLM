@@ -4,16 +4,61 @@ pois:
     x: 0.0
     y: 0.0
     trigger_radius: 1.2
-    narration_text: "Welcome to the East Gate. This is the opening stop for the mock guided tour."
+    short_text: "Welcome to the East Gate, the opening stop of the mock tour."
+    standard_text: "Welcome to the East Gate. This is the opening stop for the mock guided tour and the handoff point into the structured narration system."
+    extended_text: "Welcome to the East Gate. This opening stop is used to validate that the tour can trigger a short introduction, a standard explanation, or an extended guided version without changing the orchestrator flow."
+    facts:
+      - "The East Gate is the first POI in the demo route."
+      - "It is used to verify the first narration trigger in mock mode."
+    faq:
+      - question: "Why does the tour start here?"
+        answer: "The East Gate is configured as the first stop so we can verify the route enters a POI and triggers narration immediately."
+      - question: "What does this stop validate?"
+        answer: "It validates the first POI trigger, session logging, and narrator selection flow."
+    tags:
+      - entrance
+      - onboarding
+    persona: calm_guide
+    theme: orientation
   - spot_id: plaza
     name: Central Plaza
     x: 5.0
     y: 1.0
     trigger_radius: 1.0
-    narration_text: "This central plaza is our shared activity area and a good checkpoint for route validation."
+    short_text: "This is the Central Plaza, a shared activity area in the demo route."
+    standard_text: "This central plaza is our shared activity area and a good checkpoint for route validation."
+    extended_text: "This central plaza is our shared activity area and a useful mid-route checkpoint. In the mock stack it helps confirm that the system can continue through multiple POIs while preserving state transitions and narrator output."
+    facts:
+      - "The plaza is the second stop in the demo route."
+      - "Its position helps verify mid-route trigger behavior."
+    faq:
+      - question: "Why is the plaza important?"
+        answer: "It gives us a mid-route stop to confirm the tour can continue after the first narration event."
+      - question: "What do we check here?"
+        answer: "We check route progress, trigger stability, and session continuity."
+    tags:
+      - center
+      - validation
+    persona: calm_guide
+    theme: navigation
   - spot_id: gallery
     name: History Gallery
     x: 9.5
     y: -0.5
     trigger_radius: 1.1
-    narration_text: "The history gallery stop proves that the mock adapter can continue through multiple POIs without duplicate triggers."
+    short_text: "This is the History Gallery, the final stop in the demo route."
+    standard_text: "The history gallery stop proves that the mock adapter can continue through multiple POIs without duplicate triggers."
+    extended_text: "The history gallery is the final stop in the demo route. It demonstrates that the tour can complete a multi-POI run, emit a final narration, and finish with a clean session summary that is still suitable for later LLM enhancement."
+    facts:
+      - "The gallery is the last POI in the demo route."
+      - "It is used to verify final narration and route completion."
+    faq:
+      - question: "What does this final stop prove?"
+        answer: "It proves that the route can finish cleanly after several narrations without duplicate triggers."
+      - question: "Why is it called a gallery?"
+        answer: "The gallery label is a simple content theme for the final stop and gives the narrator a richer structured context."
+    tags:
+      - history
+      - finale
+    persona: calm_guide
+    theme: exhibit

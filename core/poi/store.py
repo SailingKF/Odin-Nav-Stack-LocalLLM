@@ -18,8 +18,11 @@ class InMemoryPoiStore(PoiStore, ContentProvider):
             raise KeyError(f"Unknown POI: {spot_id}")
         return poi
 
-    def get_narration_text(self, spot_id: str) -> str:
-        return self.get_poi(spot_id).narration_text
+    def get_poi_content(self, spot_id: str) -> POI:
+        return self.get_poi(spot_id)
+
+    def get_narration_text(self, spot_id: str, mode: str = "standard") -> str:
+        return self.get_poi(spot_id).text_for_mode(mode)
 
     def route_pois(self, route: RouteDefinition) -> List[POI]:
         return [self.get_poi(spot_id) for spot_id in route.spot_ids]

@@ -16,15 +16,24 @@ class ApiServerTests(unittest.TestCase):
         config = {
             "env_name": "dev",
             "pose_provider_type": "mock",
+            "narrator_type": "mock",
+            "narration_mode_default": "standard",
+            "llm_gateway_url": "http://127.0.0.1:9000",
             "session_log_dir": str(session_dir),
             "recording_enabled": False,
             "current_route_file": "content/routes/demo_route.yaml",
             "current_poi_file": "content/poi/demo_pois.yaml",
         }
-        runtime = MockTourApiRuntime(config=config, repo_root=REPO_ROOT, step_interval_seconds=0.02)
-        self.client = TestClient(create_app(runtime=runtime))
+        self.runtime = MockTourApiRuntime(config=config, repo_root=REPO_ROOT, step_interval_seconds=0.02)
+        self.client = TestClient(create_app(runtime=self.runtime))
 
     def tearDown(self) -> None:
+        deadline = time.time() + 3.0
+        while time.time() < deadline:
+            state = self.runtime.state()
+            if not state.get("is_running"):
+                break
+            time.sleep(0.05)
         self._temp_dir.cleanup()
 
     def test_health_and_state(self) -> None:
@@ -48,6 +57,7 @@ class ApiServerTests(unittest.TestCase):
         self.assertIn("Start Tour", response.text)
         self.assertIn("Refresh Status", response.text)
         self.assertIn("http://127.0.0.1:8000", response.text)
+        self.assertIn("Ask Question", response.text)
 
     def test_control_endpoints_and_latest_session(self) -> None:
         start_response = self.client.post("/tour/start")
@@ -76,6 +86,19 @@ class ApiServerTests(unittest.TestCase):
         self.assertIsNotNone(session_payload["session_id"])
         self.assertGreater(session_payload["event_count"], 0)
         self.assertIn("latest_state", session_payload)
+        self.assertIn("latest_narration_text", session_payload)
+
+    def test_question_endpoint_returns_answer(self) -> None:
+        self.client.post("/tour/start")
+        time.sleep(0.25)
+
+        question_response = self.client.post("/tour/question", json={"question": "Why does the tour start here?"})
+
+        self.assertEqual(question_response.status_code, 200)
+        payload = question_response.json()
+        self.assertTrue(payload["ok"])
+        self.assertIn("answer_text", payload)
+        self.assertIn("state", payload)
 
 
 if __name__ == "__main__":

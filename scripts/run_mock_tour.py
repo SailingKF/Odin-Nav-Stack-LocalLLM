@@ -8,6 +8,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from adapters.mock.mock_pose_provider import MockPoseProvider
+from core.narrator.factory import build_narrator
 from core.poi.loader import load_pois, load_route
 from core.poi.store import InMemoryPoiStore
 from core.session.logger import JsonlSessionStore
@@ -30,6 +31,7 @@ def main() -> int:
     route = load_route(str(route_file))
     poi_store = InMemoryPoiStore(pois)
     route_pois = poi_store.route_pois(route)
+    narrator = build_narrator(config)
 
     if config["pose_provider_type"] != "mock":
         raise ValueError("dev.yaml must use the mock pose provider in this foundation bundle.")
@@ -41,19 +43,24 @@ def main() -> int:
             "pose_provider_type": config["pose_provider_type"],
             "route_id": route.route_id,
             "recording_enabled": bool(config["recording_enabled"]),
+            "narrator_type": config.get("narrator_type", "mock"),
         }
     )
 
     orchestrator = TourOrchestrator(
         route_pois=route_pois,
-        content_provider=poi_store,
+        narrator=narrator,
         session_store=session_store,
         event_callback=print,
+        narration_mode_default=str(config.get("narration_mode_default", "standard")),
     )
 
     provider = MockPoseProvider.from_route_pois(route_pois)
 
-    print(f"[CONFIG] env={config['env_name']} pose_provider={config['pose_provider_type']} route={route.route_id}")
+    print(
+        f"[CONFIG] env={config['env_name']} pose_provider={config['pose_provider_type']} "
+        f"narrator={config.get('narrator_type', 'mock')} route={route.route_id}"
+    )
     for pose in provider.iter_poses():
         print(f"[POSE] x={pose.x:.2f} y={pose.y:.2f}")
         orchestrator.handle_pose(pose)
