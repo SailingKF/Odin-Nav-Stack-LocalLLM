@@ -5,3 +5,4 @@ maps/
 session_logs/
 __pycache__/
 *.pyc
+.vendor_wheels/

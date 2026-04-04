@@ -1,0 +1,50 @@
+from pathlib import Path
+from typing import Optional
+
+from fastapi import FastAPI
+
+from services.api_server.runtime import MockTourApiRuntime
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def create_app(
+    runtime: Optional[MockTourApiRuntime] = None,
+    config_path: Optional[Path] = None,
+) -> FastAPI:
+    app = FastAPI(title="Odin Nav Stack Local LLM Mock Tour API", version="0.1.0")
+    active_runtime = runtime or MockTourApiRuntime.from_config_path(
+        config_path=config_path or REPO_ROOT / "configs" / "dev.yaml",
+        repo_root=REPO_ROOT,
+    )
+    app.state.runtime = active_runtime
+
+    @app.get("/health")
+    def health() -> dict:
+        return active_runtime.health()
+
+    @app.get("/state")
+    def state() -> dict:
+        return active_runtime.state()
+
+    @app.post("/tour/start")
+    def start_tour() -> dict:
+        return active_runtime.start_tour()
+
+    @app.post("/tour/pause")
+    def pause_tour() -> dict:
+        return active_runtime.pause_tour()
+
+    @app.post("/tour/resume")
+    def resume_tour() -> dict:
+        return active_runtime.resume_tour()
+
+    @app.post("/tour/next")
+    def next_poi() -> dict:
+        return active_runtime.next_poi()
+
+    @app.get("/session/latest")
+    def latest_session() -> dict:
+        return active_runtime.latest_session()
+
+    return app

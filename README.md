@@ -80,6 +80,45 @@ Planned extension path:
 - keep the core tour logic unchanged when moving to Orin NX
 - add an Android-friendly backend and UI on top of the same session and orchestrator flow
 
+## Local API Control Layer
+
+This iteration adds a lightweight FastAPI backend in `services/api_server/` so an Android browser or H5 debug client can control the mock tour without coupling UI logic into the core modules.
+
+What is included:
+- FastAPI app factory in `services/api_server/app.py`
+- runtime wrapper for mock tour control in `services/api_server/runtime.py`
+- control endpoints for health, state, start, pause, resume, next, and latest session
+- a new startup entrypoint in `scripts/run_api_server.py`
+
+How to start the local API service:
+```shell
+python scripts/run_api_server.py
+```
+
+Example calls:
+```shell
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/state
+curl -X POST http://127.0.0.1:8000/tour/start
+curl -X POST http://127.0.0.1:8000/tour/pause
+curl -X POST http://127.0.0.1:8000/tour/resume
+curl -X POST http://127.0.0.1:8000/tour/next
+curl http://127.0.0.1:8000/session/latest
+```
+
+Why this structure fits Android and Orin NX:
+- the backend remains thin and platform-agnostic
+- the core tour logic still lives under `core/`
+- the mock pose source still lives under `adapters/mock/`
+- the API surface is simple enough for Android browser or H5 tooling
+- the dependency footprint stays small enough for future Orin NX deployment
+
+Current API limitations:
+- only the mock pose provider is wired to the API in this round
+- the control flow uses a minimal background loop, not a full scheduler
+- there is still no TTS, ASR, real LLM, video recorder, Isaac Sim, or ROS/Odin integration
+- the API provides JSON control and inspection only, not a rendered web page
+
 # Quick Start
 
 The code has been tested on:
