@@ -159,9 +159,11 @@ Current runtime-facing profile summary now exposes:
 - active mock-only components
 - placeholder components that still block true edge readiness
 - validation warnings/errors for obvious mismatches
+- preflight dependency checks and safe local probes
 
 See also:
 - `docs/DEPLOYMENT_PROFILE_CONTRACT.md`
+- `docs/DEPLOYMENT_PREFLIGHT_CONTRACT.md`
 
 ---
 
@@ -285,6 +287,11 @@ For edge:
 - core tour loop works even if non-essential services are disabled
 - deployment profile reports whether the current config is still placeholder/mock
 - obvious pose/audio/LLM mismatches appear as validation warnings or errors
+- preflight reports which dependencies are:
+  - locally probeable now
+  - unreachable
+  - missing
+  - still external/unverified
 
 ---
 

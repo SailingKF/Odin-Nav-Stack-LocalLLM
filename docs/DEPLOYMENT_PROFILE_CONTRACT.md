@@ -11,6 +11,7 @@ The goal is to keep environment-specific readiness logic out of `core/` while st
 Current implementation lives in:
 
 - `services/deployment_profile/profile.py`
+- `services/deployment_profile/preflight.py`
 
 It is consumed by runtime-facing services such as:
 
@@ -107,6 +108,10 @@ It should not:
 ## Current Limitations
 
 - the profile layer is a focused summary/validation seam, not a full deployment manager
-- it does not install dependencies or probe real hardware
+- it does not install dependencies or prove real hardware readiness
 - `edge` can still be `placeholder` even when the API is healthy
 - true Orin NX readiness still depends on real pose, audio, and service integration later
+
+For current startup-time dependency checks, see:
+
+- `docs/DEPLOYMENT_PREFLIGHT_CONTRACT.md`

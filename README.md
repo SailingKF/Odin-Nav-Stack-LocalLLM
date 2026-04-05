@@ -539,6 +539,51 @@ Focused contract doc:
 - `docs/DEPLOYMENT_PROFILE_CONTRACT.md`
 - `docs/DEPLOYMENT.md`
 
+## Deployment Preflight And Dependency Probe
+
+This iteration adds a thin startup-time preflight layer on top of the deployment profile summary.
+
+What it does:
+- checks whether configured route and POI files exist
+- checks whether the configured session log directory can be created and written
+- probes local HTTP dependencies with short timeouts when safe
+- explicitly labels dependencies that remain external or unverified
+
+Current API-visible surface:
+- `deployment_preflight`
+
+Current per-check statuses:
+- `ok`
+- `unreachable`
+- `missing`
+- `unverified_external`
+- `not_applicable`
+
+Current safe probes:
+- `llm_gateway` via `/health` when `narrator_type: local_llm`
+- `ollama_runtime` via `/api/tags` when `llm_backend_type: ollama`
+
+Current external/unverified markers include:
+- `hardware_pose_dependency` for `pose_provider_type: odin_ros`
+- `isaac_live_dependency` for live simulator mode
+- `audio_device_dependency` for non-mock audio paths
+
+How to inspect it:
+```shell
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/state
+```
+
+What this preflight does not prove:
+- that ROS/Odin hardware is actually publishing
+- that a real audio device path works end-to-end
+- that live Isaac integration is attached and producing poses
+- that a reachable LLM runtime is fully correct for deployment
+
+Focused contract docs:
+- `docs/DEPLOYMENT_PREFLIGHT_CONTRACT.md`
+- `docs/DEPLOYMENT_PROFILE_CONTRACT.md`
+
 How to validate the service-backed path:
 ```shell
 python scripts/run_mock_tour.py

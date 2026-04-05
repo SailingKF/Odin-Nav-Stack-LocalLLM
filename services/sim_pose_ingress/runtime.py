@@ -11,7 +11,7 @@ from core.poi.loader import load_pois, load_route
 from core.poi.store import InMemoryPoiStore
 from core.session.logger import JsonlSessionStore, build_audio_lifecycle_session_persister
 from core.tour_orchestrator.orchestrator import TourOrchestrator
-from services.deployment_profile import build_deployment_profile
+from services.deployment_profile import build_deployment_preflight, build_deployment_profile
 
 
 class SimPoseIngressRuntime:
@@ -28,6 +28,7 @@ class SimPoseIngressRuntime:
         self._pose_provider: Optional[ExternalPoseProvider] = None
         self._session_log_dir = repo_root / config["session_log_dir"]
         self._deployment_profile = build_deployment_profile(config)
+        self._deployment_preflight = build_deployment_preflight(config, repo_root)
 
     @classmethod
     def from_config_path(
@@ -89,6 +90,7 @@ class SimPoseIngressRuntime:
             "audio_output_type": self._config.get("audio_output_type", "mock"),
             "ingress_contract": {"required_fields": ["x", "y"], "optional_fields": ["label"]},
             "deployment_profile": self._deployment_profile,
+            "deployment_preflight": self._deployment_preflight,
         }
 
     def state(self) -> Dict[str, Any]:
@@ -114,9 +116,11 @@ class SimPoseIngressRuntime:
                 "last_audio_playback": None,
                 "session_log_path": None,
                 "deployment_profile": self._deployment_profile,
+                "deployment_preflight": self._deployment_preflight,
             }
         state = self._orchestrator.get_state()
         state["deployment_profile"] = self._deployment_profile
+        state["deployment_preflight"] = self._deployment_preflight
         return state
 
     def start(self) -> Dict[str, Any]:
