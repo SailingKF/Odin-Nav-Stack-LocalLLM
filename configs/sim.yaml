@@ -1,5 +1,5 @@
 env_name: sim
-pose_provider_type: isaac_sim
+pose_provider_type: sim_ingress
 narrator_type: mock
 narration_mode_default: standard
 llm_gateway_url: http://127.0.0.1:9000
