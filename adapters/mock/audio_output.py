@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from adapters.mock.artifact_player import ArtifactPlaybackHandle, ArtifactPlaybackRequest, build_artifact_player_backend
+from adapters.mock.artifact_player import ArtifactPlaybackHandle, ArtifactPlaybackRequest, ArtifactPlaybackStartError, build_artifact_player_backend
 from core.interfaces.audio_output import AudioOutput, AudioPlaybackRequest, AudioPlaybackResult
 from services.tts_service.service import TTSService, TTSRequest, TTSResponse, build_tts_service
 
@@ -197,6 +197,8 @@ class ServiceBackedTTSAudioOutput(AudioOutput, _PreparedAudioDelegate):
                     "tts_backend_type": prepared.metadata.get("tts_backend_type", prepared.metadata.get("backend_type")),
                     "tts_status": prepared.metadata.get("tts_status", prepared.metadata.get("status")),
                     "estimated_duration_ms": prepared.metadata.get("estimated_duration_ms", prepared.duration_ms),
+                    "simulate_playback_start_failure": prepared.request.metadata.get("simulate_playback_start_failure"),
+                    "simulate_active_playback_failure_after_ms": prepared.request.metadata.get("simulate_active_playback_failure_after_ms"),
                 },
             )
         )
@@ -303,7 +305,9 @@ class ServiceBackedTTSAudioOutput(AudioOutput, _PreparedAudioDelegate):
         return {
             "completion_supported": True,
             "completion_reported": observation.status == "completed",
+            "failure_reported": observation.status == "failed",
             "completion_source": "backend_reported" if observation.status == "completed" else None,
+            "failure_source": "backend_reported" if observation.status == "failed" else None,
             "latest_handle_status": observation.status,
             "observation": observation.to_metadata_dict(),
             "metadata_updates": {
@@ -313,6 +317,7 @@ class ServiceBackedTTSAudioOutput(AudioOutput, _PreparedAudioDelegate):
                 },
                 "playback_completion_supported": True,
                 "playback_completion_source": "backend_reported" if observation.status == "completed" else None,
+                "playback_failure_source": "backend_reported" if observation.status == "failed" else None,
                 "latest_playback_handle_status": observation.status,
                 "playback_completion_observation": observation.to_metadata_dict(),
             },
@@ -405,8 +410,58 @@ class ManagedAudioOutput(AudioOutput):
             next_item = self._queued_playbacks.pop(0)
             self._start_item(next_item, now)
 
-    def _start_item(self, item: Dict[str, Any], now: float) -> None:
-        delegate_result = self._delegate.start_prepared(item["prepared"])
+    def _fail_item(self, item: Dict[str, Any], now: float, failure_source: str, extra: Optional[Dict[str, Any]] = None) -> None:
+        item["status"] = "failed"
+        queue_advanced = len(self._queued_playbacks) > 0
+        item["metadata"] = {
+            **dict(item["metadata"]),
+            "playback_failure_source": failure_source,
+            "degraded_continuation_applied": True,
+        }
+        self._record_event(
+            "playback_failed",
+            item,
+            now,
+            extra={
+                "failure_source": failure_source,
+                "degraded_continuation_policy": "mark_failed_and_continue_queue",
+                "queue_advanced": queue_advanced,
+                "latest_playback_handle_status": item["metadata"].get("latest_playback_handle_status"),
+                **(extra or {}),
+            },
+        )
+        if self._active_playback is item:
+            self._active_playback = None
+        if self._queued_playbacks:
+            next_item = self._queued_playbacks.pop(0)
+            self._start_item(next_item, now)
+
+    def _start_item(self, item: Dict[str, Any], now: float) -> Dict[str, Any]:
+        try:
+            delegate_result = self._delegate.start_prepared(item["prepared"])
+        except ArtifactPlaybackStartError as exc:
+            failure_payload = exc.to_metadata_dict()
+            item["metadata"] = {
+                **dict(item["metadata"]),
+                **failure_payload,
+                "player_start_hook_invoked": True,
+                "start_hook_invoked": False,
+            }
+            self._fail_item(
+                item,
+                now,
+                failure_source="start_failed",
+                extra={
+                    "failure_status": exc.failure_status,
+                    "failure_message": exc.message,
+                    "failure_metadata": dict(exc.metadata),
+                    "player_start_hook_invoked": True,
+                },
+            )
+            return {
+                "started": False,
+                "failure_payload": failure_payload,
+            }
         item["metadata"] = dict(delegate_result.metadata)
         item["status"] = "playing"
         item["started_at_monotonic"] = now
@@ -418,6 +473,10 @@ class ManagedAudioOutput(AudioOutput):
             now,
             extra={"start_status": delegate_result.status},
         )
+        return {
+            "started": True,
+            "delegate_result": delegate_result,
+        }
 
     def _complete_expired_playback(self, now: float) -> None:
         while self._active_playback is not None:
@@ -437,6 +496,19 @@ class ManagedAudioOutput(AudioOutput):
                             "completion_supported": bool(completion_state.get("completion_supported")),
                             "player_completion_hook_invoked": True,
                             "playback_completion_observation": completion_state.get("observation"),
+                        },
+                    )
+                    continue
+                if completion_state.get("failure_reported"):
+                    self._fail_item(
+                        active,
+                        now,
+                        failure_source=str(completion_state.get("failure_source") or "backend_reported"),
+                        extra={
+                            "failure_status": (completion_state.get("observation") or {}).get("metadata", {}).get("failure_status"),
+                            "failure_reason": (completion_state.get("observation") or {}).get("metadata", {}).get("failure_reason"),
+                            "playback_failure_observation": completion_state.get("observation"),
+                            "player_failure_hook_invoked": True,
                         },
                     )
                     continue
@@ -512,11 +584,15 @@ class ManagedAudioOutput(AudioOutput):
         returned_status = "started"
 
         if self._active_playback is None:
-            self._start_item(item, now)
+            start_result = self._start_item(item, now)
+            if not start_result.get("started"):
+                lifecycle_action = "failed_start_continued"
+                returned_status = "failed"
         elif request.playback_kind == "answer":
             replaced_playback_id = self._interrupt_active(item, now)
-            self._start_item(item, now)
-            lifecycle_action = "replaced_active"
+            start_result = self._start_item(item, now)
+            lifecycle_action = "replaced_active" if start_result.get("started") else "failed_start_continued"
+            returned_status = "started" if start_result.get("started") else "failed"
         else:
             item["status"] = "queued"
             self._queued_playbacks.append(item)

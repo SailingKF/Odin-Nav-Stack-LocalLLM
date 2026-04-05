@@ -31,6 +31,7 @@ The playback backend receives an already synthesized artifact and is responsible
 - returning observable playback-handle metadata
 - interrupting a previously started handle
 - reporting latest playback-handle state for completion polling
+- surfacing playback failure during start or later handle-state polling
 
 Minimal start input:
 
@@ -69,6 +70,7 @@ Completion observation returns:
 - `completion_supported`
 - `observed_at_monotonic`
 - `completed_at_monotonic`
+- `failed_at_monotonic`
 - `metadata`
 
 ## Current Development Backend
@@ -87,6 +89,9 @@ Behavior:
   - `active`
   - `completed`
   - `interrupted`
+  - `failed`
+
+Start failure can also be surfaced before a handle becomes active.
 
 ## Ownership Split
 
@@ -139,6 +144,15 @@ Completion events now include:
 - `latest_playback_handle_status`
 - `player_completion_hook_invoked`
 - `playback_completion_observation`
+
+Failure events now include:
+
+- `failure_source`
+- `failure_status`
+- `failure_message`
+- `queue_advanced`
+- `degraded_continuation_policy`
+- `playback_failure_observation`
 
 ## Current Config Knob
 

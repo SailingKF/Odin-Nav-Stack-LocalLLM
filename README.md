@@ -443,6 +443,31 @@ Focused contract docs:
 - `docs/ARTIFACT_PLAYER_BACKEND.md`
 - `docs/AUDIO_PLAYBACK_POLICY.md`
 
+## Playback Failure And Degraded Continuation Baseline
+
+This iteration adds a narrow playback-failure seam for service-backed playback and defines one explicit degraded continuation policy.
+
+Chosen degraded policy:
+- mark the failed playback item as failed
+- record failure metadata in lifecycle state
+- continue the queue instead of stalling the whole audio path
+
+Failure cases now modeled:
+- playback start failure before an item becomes active
+- active service-backed playback later reporting `failed`
+
+What runtime metadata now makes visible:
+- `playback_failure_source`
+- `failure_status`
+- `failure_message`
+- `degraded_continuation_applied`
+- `degraded_continuation_policy`
+- `playback_failure_observation`
+
+What `playback_failed` events now distinguish:
+- `failure_source: "start_failed"`
+- `failure_source: "backend_reported"`
+
 Focused contract docs:
 - `docs/TTS_SERVICE_CONTRACT.md`
 - `docs/ARTIFACT_PLAYER_BACKEND.md`

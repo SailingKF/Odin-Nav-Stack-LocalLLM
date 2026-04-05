@@ -28,6 +28,10 @@ Behavior:
 - if an answer arrives while another playback item is active:
   - the currently active playback is interrupted
   - the answer starts immediately
+- if playback start fails or an active service-backed item later reports failure:
+  - the failed item is marked failed
+  - a failure lifecycle event is recorded
+  - the queue is allowed to continue instead of stalling
 
 Why this policy was chosen:
 
@@ -62,6 +66,8 @@ For service-backed playback, actual artifact start / interrupt hooks now live be
 - `adapters/mock/artifact_player.py`
 
 Service-backed completion polling now also lives behind that playback backend seam.
+
+Service-backed failure reporting now also lives behind that playback backend seam.
 
 ## Where Preparation Ends And Playback Start Begins
 
@@ -102,6 +108,13 @@ Completion now means:
 - service-backed playback first consults backend-side handle state
 - if the playback backend reports `completed`, queue rollover happens from that signal
 - modes without backend-side completion reporting still use estimated-duration fallback
+
+Failure now means:
+
+- service-backed start may fail before active playback is established
+- service-backed active playback may later report `failed`
+- the lifecycle manager applies one degraded policy:
+  - `mark_failed_and_continue_queue`
 
 ## Observable Runtime State
 
@@ -155,9 +168,15 @@ Lifecycle events now include:
 - `completion_source: "backend_reported"`
 - `completion_source: "estimated_fallback"`
 
+`playback_failed` now distinguishes:
+
+- `failure_source: "start_failed"`
+- `failure_source: "backend_reported"`
+
 ## What Still Remains Before Real Backend Playback Control
 
 - true device-level start/stop control
 - real interruption of an engine that is already emitting audio
 - synchronization between real engine completion and the backend polling contract
+- richer failure classification and retry rules for real playback engines
 - queue persistence and recovery rules

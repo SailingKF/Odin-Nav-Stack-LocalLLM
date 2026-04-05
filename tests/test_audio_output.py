@@ -155,6 +155,8 @@ class AudioOutputTests(unittest.TestCase):
         self.assertGreaterEqual(len(completed_events), 1)
         self.assertEqual(completed_events[-1]["extra"]["completion_source"], "backend_reported")
         self.assertTrue(completed_events[-1]["extra"]["player_completion_hook_invoked"])
+        failed_events = [item for item in playback_state["recent_events"] if item["event_type"] == "playback_failed"]
+        self.assertEqual(len(failed_events), 0)
         self.assertEqual(playback_state["active_playback"]["spot_id"], "plaza")
         self.assertEqual(playback_state["active_playback"]["status"], "playing")
         self.assertEqual(playback_state["active_playback"]["metadata"]["latest_playback_handle_status"], "active")

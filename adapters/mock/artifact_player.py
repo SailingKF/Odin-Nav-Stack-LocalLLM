@@ -45,6 +45,7 @@ class ArtifactPlaybackObservation:
     completion_supported: bool
     observed_at_monotonic: Optional[float] = None
     completed_at_monotonic: Optional[float] = None
+    failed_at_monotonic: Optional[float] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_metadata_dict(self) -> Dict[str, Any]:
@@ -65,6 +66,23 @@ class ArtifactPlayerBackend(ABC):
         """Return the latest observable playback state for a started handle."""
 
 
+class ArtifactPlaybackStartError(RuntimeError):
+    def __init__(self, backend_type: str, failure_status: str, message: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+        super().__init__(message)
+        self.backend_type = backend_type
+        self.failure_status = failure_status
+        self.message = message
+        self.metadata = metadata or {}
+
+    def to_metadata_dict(self) -> Dict[str, Any]:
+        return {
+            "playback_backend_type": self.backend_type,
+            "failure_status": self.failure_status,
+            "failure_message": self.message,
+            "failure_metadata": dict(self.metadata),
+        }
+
+
 class MockArtifactPlayerBackend(ArtifactPlayerBackend):
     backend_type = "mock_artifact_player"
 
@@ -81,6 +99,13 @@ class MockArtifactPlayerBackend(ArtifactPlayerBackend):
         self._handle_runtime_state: Dict[str, Dict[str, Any]] = {}
 
     def start_artifact(self, request: ArtifactPlaybackRequest) -> ArtifactPlaybackHandle:
+        if bool(request.metadata.get("simulate_playback_start_failure")):
+            raise ArtifactPlaybackStartError(
+                backend_type=self.backend_type,
+                failure_status="artifact_player_start_failed",
+                message="Mock artifact player simulated a playback start failure.",
+                metadata={"failure_mode": "start_failure"},
+            )
         handle = ArtifactPlaybackHandle(
             backend_type=self.backend_type,
             handle_id=f"artifact-playback-{self._next_handle_id}",
@@ -102,8 +127,10 @@ class MockArtifactPlayerBackend(ArtifactPlayerBackend):
             "status": "active",
             "started_at_monotonic": self._clock(),
             "completed_at_monotonic": None,
+            "failed_at_monotonic": None,
             "interrupted_at_monotonic": None,
             "expected_duration_ms": int(request.metadata.get("estimated_duration_ms", 0)),
+            "fail_after_ms": request.metadata.get("simulate_active_playback_failure_after_ms"),
         }
         if self._event_callback is not None:
             label = request.spot_name or request.spot_id or "tour"
@@ -140,9 +167,15 @@ class MockArtifactPlayerBackend(ArtifactPlayerBackend):
         if state["status"] == "active":
             expected_duration_ms = int(state.get("expected_duration_ms", 0))
             started_at = state.get("started_at_monotonic")
+            fail_after_ms = state.get("fail_after_ms")
+            if fail_after_ms is not None and started_at is not None:
+                elapsed_ms = int((now - started_at) * 1000)
+                if elapsed_ms >= int(fail_after_ms):
+                    state["status"] = "failed"
+                    state["failed_at_monotonic"] = now
             if expected_duration_ms > 0 and started_at is not None:
                 elapsed_ms = int((now - started_at) * 1000)
-                if elapsed_ms >= expected_duration_ms:
+                if state["status"] == "active" and elapsed_ms >= expected_duration_ms:
                     state["status"] = "completed"
                     state["completed_at_monotonic"] = now
 
@@ -153,8 +186,11 @@ class MockArtifactPlayerBackend(ArtifactPlayerBackend):
             completion_supported=True,
             observed_at_monotonic=now,
             completed_at_monotonic=state.get("completed_at_monotonic"),
+            failed_at_monotonic=state.get("failed_at_monotonic"),
             metadata={
                 "expected_duration_ms": state.get("expected_duration_ms"),
+                "failure_status": "artifact_player_active_failed" if state["status"] == "failed" else None,
+                "failure_reason": "simulated_active_playback_failure" if state["status"] == "failed" else None,
                 "started_at_monotonic": state.get("started_at_monotonic"),
                 "interrupted_at_monotonic": state.get("interrupted_at_monotonic"),
             },

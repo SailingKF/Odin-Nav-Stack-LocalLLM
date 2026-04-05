@@ -106,6 +106,12 @@ Completion ownership also remains outside the TTS service:
 - the playback backend reports handle state
 - the audio-output lifecycle manager consumes that state and falls back to estimated completion only when no backend-side completion reporting exists
 
+Playback failure ownership also remains outside the TTS service:
+
+- the TTS service does not decide queue continuation after playback failure
+- the playback backend surfaces start / active-playback failure
+- the audio-output lifecycle manager applies the degraded continuation policy
+
 ## Current Config Knobs
 
 Current config fields:
