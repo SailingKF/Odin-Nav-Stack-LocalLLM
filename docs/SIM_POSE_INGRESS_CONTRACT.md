@@ -29,6 +29,10 @@ Publisher-side frame transform:
 - `adapters/sim/frame_transform.py`
 - `docs/SIM_FRAME_TRANSFORM_CONTRACT.md`
 
+Publisher-side projection:
+- `adapters/sim/projection.py`
+- `docs/SIM_POSE_PROJECTION_CONTRACT.md`
+
 ## Payload Contract
 
 Each externally supplied pose payload uses this shape:

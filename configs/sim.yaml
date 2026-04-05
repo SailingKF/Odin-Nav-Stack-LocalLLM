@@ -12,6 +12,14 @@ session_log_dir: session_logs/sim
 recording_enabled: false
 current_route_file: content/routes/demo_route.yaml
 current_poi_file: content/poi/demo_pois.yaml
+publisher_pose_projection:
+  projected_x_field: sim_x
+  projected_y_field: sim_y
+  planar_x_source_path: position.x
+  planar_y_source_path: position.y
+  planar_z_source_path: position.z
+  yaw_source_path: orientation.yaw_rad
+  label_field: label
 publisher_frame_transform:
   raw_x_field: sim_x
   raw_y_field: sim_y

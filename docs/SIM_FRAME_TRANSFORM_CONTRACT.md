@@ -18,6 +18,11 @@ Publisher-side HTTP client:
 Existing normalized HTTP bridge:
 - `services/sim_pose_ingress/app.py`
 
+If the simulator publishes a richer nested payload first:
+- project it with `adapters/sim/projection.py`
+- then apply this frame transform seam
+- see `docs/SIM_POSE_PROJECTION_CONTRACT.md`
+
 ## Raw Simulator Payload Shape Used In This Round
 
 ```json

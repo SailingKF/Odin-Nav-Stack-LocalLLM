@@ -109,6 +109,12 @@ If a simulator publishes raw frame coordinates instead of normalized map-frame c
 - then send the resulting `x`, `y`, and optional `label` to this HTTP bridge
 - see `docs/SIM_FRAME_TRANSFORM_CONTRACT.md`
 
+If a simulator publishes a richer payload with nested position/orientation fields:
+- project it into planar raw coordinates first
+- then run the existing frame transform
+- then send the resulting normalized payload to this HTTP bridge
+- see `docs/SIM_POSE_PROJECTION_CONTRACT.md`
+
 ## Demo Usage
 
 Start the bridge:
