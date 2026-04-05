@@ -12,6 +12,7 @@ from core.poi.store import InMemoryPoiStore
 from core.session.logger import JsonlSessionStore, build_audio_lifecycle_session_persister
 from core.tour_orchestrator.orchestrator import TourOrchestrator
 from services.deployment_profile import (
+    build_deployment_command_manifest,
     build_deployment_launch_plan,
     build_deployment_preflight,
     build_deployment_profile,
@@ -38,6 +39,10 @@ class SimPoseIngressRuntime:
         self._deployment_readiness = build_deployment_readiness(
             self._deployment_profile,
             self._deployment_preflight,
+            self._deployment_launch_plan,
+        )
+        self._deployment_command_manifest = build_deployment_command_manifest(
+            config,
             self._deployment_launch_plan,
         )
 
@@ -104,6 +109,7 @@ class SimPoseIngressRuntime:
             "deployment_preflight": self._deployment_preflight,
             "deployment_launch_plan": self._deployment_launch_plan,
             "deployment_readiness": self._deployment_readiness,
+            "deployment_command_manifest": self._deployment_command_manifest,
         }
 
     def state(self) -> Dict[str, Any]:
@@ -132,12 +138,14 @@ class SimPoseIngressRuntime:
                 "deployment_preflight": self._deployment_preflight,
                 "deployment_launch_plan": self._deployment_launch_plan,
                 "deployment_readiness": self._deployment_readiness,
+                "deployment_command_manifest": self._deployment_command_manifest,
             }
         state = self._orchestrator.get_state()
         state["deployment_profile"] = self._deployment_profile
         state["deployment_preflight"] = self._deployment_preflight
         state["deployment_launch_plan"] = self._deployment_launch_plan
         state["deployment_readiness"] = self._deployment_readiness
+        state["deployment_command_manifest"] = self._deployment_command_manifest
         return state
 
     def start(self) -> Dict[str, Any]:

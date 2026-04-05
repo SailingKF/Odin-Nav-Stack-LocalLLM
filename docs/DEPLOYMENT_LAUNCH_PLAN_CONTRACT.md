@@ -26,6 +26,7 @@ Current runtime-facing exposure:
 Related aggregation layer:
 
 - `deployment_readiness`
+- `deployment_command_manifest`
 
 ## Current Top-Level Surface
 
@@ -118,3 +119,4 @@ It only provides:
 For the operator-facing rollup built on top of this plan, see:
 
 - `docs/DEPLOYMENT_READINESS_CONTRACT.md`
+- `docs/DEPLOYMENT_COMMAND_MANIFEST_CONTRACT.md`

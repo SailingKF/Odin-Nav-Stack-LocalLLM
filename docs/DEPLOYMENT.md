@@ -168,6 +168,7 @@ See also:
 - `docs/DEPLOYMENT_PREFLIGHT_CONTRACT.md`
 - `docs/DEPLOYMENT_LAUNCH_PLAN_CONTRACT.md`
 - `docs/DEPLOYMENT_READINESS_CONTRACT.md`
+- `docs/DEPLOYMENT_COMMAND_MANIFEST_CONTRACT.md`
 
 ---
 
@@ -281,6 +282,13 @@ Current operator-facing readiness rollup is now also available through:
 - `python scripts/print_readiness_report.py --config configs/<profile>.yaml`
 
 This rollup is where `blocked` versus `external_unverified` becomes explicit.
+
+Current repo-owned bring-up commands are now also available through:
+
+- API `deployment_command_manifest`
+- `python scripts/print_bringup_sheet.py --config configs/<profile>.yaml`
+
+This command-manifest layer is where launch-plan steps become explicit repo commands versus manual/external operator actions.
 
 ### Current Startup Order Summary
 

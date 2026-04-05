@@ -678,6 +678,48 @@ What this still does not do:
 Focused contract doc:
 - `docs/DEPLOYMENT_READINESS_CONTRACT.md`
 
+## Deployment Command Manifest And Guided Bring-Up Sheet
+
+This iteration adds a narrow command-manifest layer that turns repo-owned startup steps into explicit commands for `dev`, `sim`, and `edge`.
+
+Current runtime-visible surface:
+- `deployment_command_manifest`
+
+What this makes easier to see:
+- which launch-plan steps map to repo-owned commands
+- which steps remain manual or external
+- which config each repo-owned command should use
+- the exact command string to run in launch order
+
+Current repo-owned command mapping examples:
+- `llm_gateway`
+  - `python scripts/run_llm_gateway.py --config configs/dev.yaml`
+- `api_server`
+  - `python scripts/run_api_server.py --config configs/dev.yaml`
+- `sim_pose_ingress_server`
+  - `python scripts/run_sim_pose_ingress_server.py --config configs/sim.yaml`
+
+Current manual or external examples with no repo command:
+- `ollama_runtime`
+- `hardware_pose_dependency`
+- `debug_browser`
+
+How to inspect it now:
+```shell
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/state
+python scripts/print_bringup_sheet.py --config configs/dev.yaml
+python scripts/print_bringup_sheet.py --config configs/edge.yaml
+```
+
+What this still does not do:
+- auto-start services
+- supervise long-running processes
+- replace real deployment packaging
+
+Focused contract doc:
+- `docs/DEPLOYMENT_COMMAND_MANIFEST_CONTRACT.md`
+
 How to validate the service-backed path:
 ```shell
 python scripts/run_mock_tour.py
