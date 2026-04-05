@@ -368,6 +368,7 @@ What you should see during a run:
 Focused contract doc:
 - `docs/AUDIO_OUTPUT_CONTRACT.md`
 - `docs/TTS_SERVICE_CONTRACT.md`
+- `docs/AUDIO_PLAYBACK_POLICY.md`
 
 What still remains before real spoken playback:
 - choosing a TTS backend
@@ -404,6 +405,33 @@ What you should see:
 - `[AUDIO] answer via tts_service/mock: ...`
 - `latest_audio_playback.extra.metadata.backend_type == "mock"`
 - a generated mock synthesis artifact under the configured `tts_artifact_dir`
+
+## Audio Queue And Interruption Policy
+
+This iteration adds a minimal playback lifecycle policy on the audio-output side so overlapping requests behave predictably before we choose a real playback engine.
+
+Chosen policy:
+- narration requests queue in FIFO order when something is already active
+- answer requests interrupt and replace the active playback immediately
+
+Observable runtime state:
+- `audio_playback_state.policy_name`
+- `audio_playback_state.active_playback`
+- `audio_playback_state.queued_playbacks`
+- `audio_playback_state.recent_events`
+
+Quick overlap validation:
+```shell
+python scripts/run_audio_overlap_demo.py
+```
+
+What you should see:
+- first narration starts
+- second narration is reported as `queued`
+- answer is reported as `replaced_active`
+
+Focused policy doc:
+- `docs/AUDIO_PLAYBACK_POLICY.md`
 
 # Quick Start
 

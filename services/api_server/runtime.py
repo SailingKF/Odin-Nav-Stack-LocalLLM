@@ -98,6 +98,7 @@ class MockTourApiRuntime:
                 "last_narration_text": None,
                 "last_answer_text": None,
                 "audio_output_type": self._config.get("audio_output_type", "mock"),
+                "audio_playback_state": None,
                 "last_audio_playback": None,
                 "session_log_path": None,
             }

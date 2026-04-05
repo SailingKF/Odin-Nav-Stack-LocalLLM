@@ -312,6 +312,7 @@ class TourOrchestrator:
             output_path = getattr(self._session_store, "output_path")
         except RuntimeError:
             output_path = None
+        playback_state = None if self._audio_output is None else self._audio_output.get_playback_state()
         return {
             "session_id": session_id,
             "state": self._state.value,
@@ -331,6 +332,7 @@ class TourOrchestrator:
             "last_narration_text": self._last_narration_text,
             "last_answer_text": self._last_answer_text,
             "audio_output_type": None if self._audio_output is None else getattr(self._audio_output, "output_type", type(self._audio_output).__name__),
+            "audio_playback_state": playback_state,
             "last_audio_playback": self._last_audio_playback,
             "session_log_path": None if output_path is None else str(output_path),
         }

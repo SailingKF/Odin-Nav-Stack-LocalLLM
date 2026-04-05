@@ -29,3 +29,7 @@ class AudioOutput(ABC):
     @abstractmethod
     def play_text(self, request: AudioPlaybackRequest) -> AudioPlaybackResult:
         """Request playback of a narration or answer text segment."""
+
+    @abstractmethod
+    def get_playback_state(self) -> Dict[str, Any]:
+        """Return observable playback lifecycle state for runtime inspection."""

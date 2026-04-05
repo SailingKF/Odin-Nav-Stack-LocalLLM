@@ -31,6 +31,8 @@ Minimal playback contract:
   - status
   - original text
   - optional metadata
+- runtime state:
+  - `get_playback_state()`
 
 ## Development Mock Behavior
 
@@ -76,6 +78,7 @@ Text state is still preserved separately:
 Playback activity is exposed in runtime state and session summary through:
 
 - `audio_output_type`
+- `audio_playback_state`
 - `last_audio_playback`
 - `latest_audio_playback`
 
@@ -99,3 +102,4 @@ A future real TTS adapter still needs to decide:
 See also:
 
 - `docs/TTS_SERVICE_CONTRACT.md`
+- `docs/AUDIO_PLAYBACK_POLICY.md`

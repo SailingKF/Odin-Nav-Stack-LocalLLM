@@ -60,6 +60,7 @@ class ApiServerTests(unittest.TestCase):
         self.assertIn("is_running", payload)
         self.assertIn("session_log_path", payload)
         self.assertIn("audio_output_type", payload)
+        self.assertIn("audio_playback_state", payload)
         self.assertIn("last_audio_playback", payload)
 
     def test_debug_page_is_served_for_mobile_use(self) -> None:
@@ -187,6 +188,11 @@ class ApiServerTests(unittest.TestCase):
             self.assertEqual(payload["latest_audio_playback"]["extra"]["metadata"]["backend_type"], "mock")
             artifact_uri = payload["latest_audio_playback"]["extra"]["metadata"]["artifact"]["artifact_uri"]
             self.assertTrue(Path(artifact_uri).exists())
+            state_payload = client.get("/state").json()
+            self.assertEqual(
+                state_payload["audio_playback_state"]["policy_name"],
+                "answers_interrupt_active_playback__narration_queues_fifo",
+            )
         finally:
             self._wait_until_runtime_stops(runtime)
 
