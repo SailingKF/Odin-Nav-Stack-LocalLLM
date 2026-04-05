@@ -720,6 +720,51 @@ What this still does not do:
 Focused contract doc:
 - `docs/DEPLOYMENT_COMMAND_MANIFEST_CONTRACT.md`
 
+## Deployment Verification Manifest And Success Checks
+
+This iteration adds a narrow verification-manifest layer that makes post-start success checks explicit for repo-owned services.
+
+Current runtime-visible surface:
+- `deployment_verification_manifest`
+
+What this makes easier to see:
+- how to verify a repo-owned service after it is started
+- which health endpoint or runtime surface should be inspected
+- what fields count as a successful response for API server, LLM gateway, and sim ingress service
+- which steps remain manual or external and therefore have no repo verification contract
+
+Current verification mapping examples:
+- `llm_gateway`
+  - `GET http://127.0.0.1:9000/health`
+  - expect fields such as `service`, `active_backend_type`, and `fallback_active`
+- `api_server`
+  - `GET http://127.0.0.1:8000/health`
+  - expect fields such as `service`, `env_name`, and `deployment_profile`
+- `sim_pose_ingress_server`
+  - `GET http://127.0.0.1:8100/health`
+  - expect fields such as `service`, `ingress_contract`, and `deployment_profile`
+
+Current manual or external steps with no repo verification contract:
+- `hardware_pose_dependency`
+- `ollama_runtime`
+- `debug_browser`
+
+How to inspect it now:
+```shell
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/state
+python scripts/print_verification_sheet.py --config configs/dev.yaml
+python scripts/print_verification_sheet.py --config configs/edge.yaml
+```
+
+What this still does not do:
+- wait for services to come up
+- poll endpoints continuously
+- supervise processes
+
+Focused contract doc:
+- `docs/DEPLOYMENT_VERIFICATION_MANIFEST_CONTRACT.md`
+
 How to validate the service-backed path:
 ```shell
 python scripts/run_mock_tour.py

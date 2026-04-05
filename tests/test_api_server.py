@@ -68,6 +68,7 @@ class ApiServerTests(unittest.TestCase):
         self.assertIn("deployment_launch_plan", payload)
         self.assertIn("deployment_readiness", payload)
         self.assertIn("deployment_command_manifest", payload)
+        self.assertIn("deployment_verification_manifest", payload)
         self.assertEqual(payload["deployment_profile"]["profile_name"], "dev")
         self.assertEqual(payload["deployment_profile"]["deployment_class"], "dev_only")
         self.assertEqual(payload["deployment_profile"]["readiness_status"], "ready_for_profile")
@@ -76,6 +77,7 @@ class ApiServerTests(unittest.TestCase):
         self.assertIn("deployment_launch_plan", health.json())
         self.assertIn("deployment_readiness", health.json())
         self.assertIn("deployment_command_manifest", health.json())
+        self.assertIn("deployment_verification_manifest", health.json())
         self.assertIn("summary_status", payload["deployment_preflight"])
         self.assertIn("checks", payload["deployment_preflight"])
         self.assertIn("steps", payload["deployment_launch_plan"])
@@ -84,6 +86,8 @@ class ApiServerTests(unittest.TestCase):
         self.assertIn("steps", payload["deployment_readiness"])
         self.assertIn("commands", payload["deployment_command_manifest"])
         self.assertIn("steps", payload["deployment_command_manifest"])
+        self.assertIn("verifications", payload["deployment_verification_manifest"])
+        self.assertIn("steps", payload["deployment_verification_manifest"])
 
     def test_debug_page_is_served_for_mobile_use(self) -> None:
         response = self.client.get("/debug")

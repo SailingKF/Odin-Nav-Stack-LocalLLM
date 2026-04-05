@@ -23,6 +23,10 @@ Current runtime-facing exposure:
 
 - `deployment_command_manifest`
 
+Related post-start verification layer:
+
+- `deployment_verification_manifest`
+
 ## Current Top-Level Surface
 
 The command manifest exposes:
@@ -171,3 +175,7 @@ It only centralizes:
 - repo-owned command knowledge
 - command-to-step mapping
 - operator-facing guided bring-up output
+
+For the post-start verification layer built on top of this command mapping, see:
+
+- `docs/DEPLOYMENT_VERIFICATION_MANIFEST_CONTRACT.md`

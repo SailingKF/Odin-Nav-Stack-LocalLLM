@@ -6,6 +6,10 @@ from services.deployment_profile.command_manifest import (
     build_deployment_command_manifest,
     build_guided_bringup_sheet,
 )
+from services.deployment_profile.verification_manifest import (
+    build_bringup_verification_sheet,
+    build_deployment_verification_manifest,
+)
 
 __all__ = [
     "build_deployment_profile",
@@ -14,4 +18,6 @@ __all__ = [
     "build_deployment_readiness",
     "build_deployment_command_manifest",
     "build_guided_bringup_sheet",
+    "build_deployment_verification_manifest",
+    "build_bringup_verification_sheet",
 ]

@@ -169,6 +169,7 @@ See also:
 - `docs/DEPLOYMENT_LAUNCH_PLAN_CONTRACT.md`
 - `docs/DEPLOYMENT_READINESS_CONTRACT.md`
 - `docs/DEPLOYMENT_COMMAND_MANIFEST_CONTRACT.md`
+- `docs/DEPLOYMENT_VERIFICATION_MANIFEST_CONTRACT.md`
 
 ---
 
@@ -289,6 +290,13 @@ Current repo-owned bring-up commands are now also available through:
 - `python scripts/print_bringup_sheet.py --config configs/<profile>.yaml`
 
 This command-manifest layer is where launch-plan steps become explicit repo commands versus manual/external operator actions.
+
+Current repo-owned post-start verification checks are now also available through:
+
+- API `deployment_verification_manifest`
+- `python scripts/print_verification_sheet.py --config configs/<profile>.yaml`
+
+This verification-manifest layer is where repo-owned services become explicit endpoint/status checks versus manual/external steps that still have no repo verification contract.
 
 ### Current Startup Order Summary
 

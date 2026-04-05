@@ -17,6 +17,7 @@ from services.deployment_profile import (
     build_deployment_preflight,
     build_deployment_profile,
     build_deployment_readiness,
+    build_deployment_verification_manifest,
 )
 
 
@@ -44,6 +45,9 @@ class SimPoseIngressRuntime:
         self._deployment_command_manifest = build_deployment_command_manifest(
             config,
             self._deployment_launch_plan,
+        )
+        self._deployment_verification_manifest = build_deployment_verification_manifest(
+            self._deployment_command_manifest,
         )
 
     @classmethod
@@ -110,6 +114,7 @@ class SimPoseIngressRuntime:
             "deployment_launch_plan": self._deployment_launch_plan,
             "deployment_readiness": self._deployment_readiness,
             "deployment_command_manifest": self._deployment_command_manifest,
+            "deployment_verification_manifest": self._deployment_verification_manifest,
         }
 
     def state(self) -> Dict[str, Any]:
@@ -139,6 +144,7 @@ class SimPoseIngressRuntime:
                 "deployment_launch_plan": self._deployment_launch_plan,
                 "deployment_readiness": self._deployment_readiness,
                 "deployment_command_manifest": self._deployment_command_manifest,
+                "deployment_verification_manifest": self._deployment_verification_manifest,
             }
         state = self._orchestrator.get_state()
         state["deployment_profile"] = self._deployment_profile
@@ -146,6 +152,7 @@ class SimPoseIngressRuntime:
         state["deployment_launch_plan"] = self._deployment_launch_plan
         state["deployment_readiness"] = self._deployment_readiness
         state["deployment_command_manifest"] = self._deployment_command_manifest
+        state["deployment_verification_manifest"] = self._deployment_verification_manifest
         return state
 
     def start(self) -> Dict[str, Any]:
