@@ -14,7 +14,11 @@ from core.session.logger import (
     build_audio_summary_from_latest_audio_playback,
 )
 from core.tour_orchestrator.orchestrator import TourOrchestrator
-from services.deployment_profile import build_deployment_preflight, build_deployment_profile
+from services.deployment_profile import (
+    build_deployment_launch_plan,
+    build_deployment_preflight,
+    build_deployment_profile,
+)
 
 
 def _build_audio_summary(
@@ -68,6 +72,7 @@ class MockTourApiRuntime:
         self._session_log_dir = repo_root / config["session_log_dir"]
         self._deployment_profile = build_deployment_profile(config)
         self._deployment_preflight = build_deployment_preflight(config, repo_root)
+        self._deployment_launch_plan = build_deployment_launch_plan(config)
 
     @classmethod
     def from_config_path(
@@ -128,6 +133,7 @@ class MockTourApiRuntime:
             "audio_output_type": self._config.get("audio_output_type", "mock"),
             "deployment_profile": self._deployment_profile,
             "deployment_preflight": self._deployment_preflight,
+            "deployment_launch_plan": self._deployment_launch_plan,
         }
 
     def state(self) -> Dict[str, Any]:
@@ -155,6 +161,7 @@ class MockTourApiRuntime:
                 "session_log_path": None,
                 "deployment_profile": self._deployment_profile,
                 "deployment_preflight": self._deployment_preflight,
+                "deployment_launch_plan": self._deployment_launch_plan,
             }
         state = self._orchestrator.get_state()
         state["audio_summary"] = _build_audio_summary(
@@ -163,6 +170,7 @@ class MockTourApiRuntime:
         )
         state["deployment_profile"] = self._deployment_profile
         state["deployment_preflight"] = self._deployment_preflight
+        state["deployment_launch_plan"] = self._deployment_launch_plan
         return state
 
     def start_tour(self) -> Dict[str, Any]:

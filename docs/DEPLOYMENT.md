@@ -160,10 +160,12 @@ Current runtime-facing profile summary now exposes:
 - placeholder components that still block true edge readiness
 - validation warnings/errors for obvious mismatches
 - preflight dependency checks and safe local probes
+- launch-plan startup order and readiness gates
 
 See also:
 - `docs/DEPLOYMENT_PROFILE_CONTRACT.md`
 - `docs/DEPLOYMENT_PREFLIGHT_CONTRACT.md`
+- `docs/DEPLOYMENT_LAUNCH_PLAN_CONTRACT.md`
 
 ---
 
@@ -258,6 +260,39 @@ Suggested future directions:
 
 For edge:
 - consider systemd-managed services when the application stabilizes
+
+Current launch guidance is now represented in a machine-readable startup contract:
+
+- `deployment_launch_plan`
+
+You can inspect it through:
+
+- API `health`
+- API `state`
+- `python scripts/print_launch_plan.py --config configs/<profile>.yaml`
+
+This round does not automate startup. It only makes current ordering, ownership, and gates explicit.
+
+### Current Startup Order Summary
+
+#### Dev
+- start external Ollama runtime when configured
+- start repo-owned LLM gateway
+- start repo-owned API server
+- optionally open `/debug`
+
+#### Sim
+- decide whether simulator source is stub or live external
+- start repo-owned sim pose ingress server
+- optionally start publisher bridge
+- optionally start API/debug server
+
+#### Edge
+- ensure external hardware pose dependency exists
+- ensure external local LLM runtime exists when configured
+- start repo-owned LLM gateway
+- start repo-owned API server
+- keep hardware audio/manual playback steps explicit until real edge audio exists
 
 ---
 

@@ -584,6 +584,53 @@ Focused contract docs:
 - `docs/DEPLOYMENT_PREFLIGHT_CONTRACT.md`
 - `docs/DEPLOYMENT_PROFILE_CONTRACT.md`
 
+## Deployment Launch Plan And Startup Contract
+
+This iteration adds a narrow launch-plan/startup-contract layer so the repo can describe what should start, in what order, and which steps are repo-owned versus external/manual.
+
+Current API-visible surface:
+- `deployment_launch_plan`
+
+Current step categories:
+- `internal_service`
+- `external_dependency`
+- `optional_service`
+
+Current startup expectations are now represented per profile:
+- `dev`
+  - external Ollama runtime when configured
+  - repo-owned llm gateway
+  - repo-owned API server
+  - optional `/debug` browser client
+- `sim`
+  - stub or live simulator source decision
+  - repo-owned sim pose ingress server
+  - optional publisher bridge
+  - optional API/debug server
+- `edge`
+  - external hardware pose dependency
+  - external LLM runtime when configured
+  - repo-owned llm gateway
+  - repo-owned API server
+  - future/manual audio-device step when edge leaves mock audio
+
+How operators can inspect it now:
+```shell
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/state
+python scripts/print_launch_plan.py --config configs/dev.yaml
+python scripts/print_launch_plan.py --config configs/edge.yaml
+```
+
+What this does not automate:
+- process supervision
+- restart logic
+- systemd/service packaging
+- real hardware bring-up
+
+Focused contract doc:
+- `docs/DEPLOYMENT_LAUNCH_PLAN_CONTRACT.md`
+
 How to validate the service-backed path:
 ```shell
 python scripts/run_mock_tour.py

@@ -11,7 +11,11 @@ from core.poi.loader import load_pois, load_route
 from core.poi.store import InMemoryPoiStore
 from core.session.logger import JsonlSessionStore, build_audio_lifecycle_session_persister
 from core.tour_orchestrator.orchestrator import TourOrchestrator
-from services.deployment_profile import build_deployment_preflight, build_deployment_profile
+from services.deployment_profile import (
+    build_deployment_launch_plan,
+    build_deployment_preflight,
+    build_deployment_profile,
+)
 
 
 class SimPoseIngressRuntime:
@@ -29,6 +33,7 @@ class SimPoseIngressRuntime:
         self._session_log_dir = repo_root / config["session_log_dir"]
         self._deployment_profile = build_deployment_profile(config)
         self._deployment_preflight = build_deployment_preflight(config, repo_root)
+        self._deployment_launch_plan = build_deployment_launch_plan(config)
 
     @classmethod
     def from_config_path(
@@ -91,6 +96,7 @@ class SimPoseIngressRuntime:
             "ingress_contract": {"required_fields": ["x", "y"], "optional_fields": ["label"]},
             "deployment_profile": self._deployment_profile,
             "deployment_preflight": self._deployment_preflight,
+            "deployment_launch_plan": self._deployment_launch_plan,
         }
 
     def state(self) -> Dict[str, Any]:
@@ -117,10 +123,12 @@ class SimPoseIngressRuntime:
                 "session_log_path": None,
                 "deployment_profile": self._deployment_profile,
                 "deployment_preflight": self._deployment_preflight,
+                "deployment_launch_plan": self._deployment_launch_plan,
             }
         state = self._orchestrator.get_state()
         state["deployment_profile"] = self._deployment_profile
         state["deployment_preflight"] = self._deployment_preflight
+        state["deployment_launch_plan"] = self._deployment_launch_plan
         return state
 
     def start(self) -> Dict[str, Any]:
