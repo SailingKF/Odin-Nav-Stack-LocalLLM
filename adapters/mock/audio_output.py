@@ -1,41 +1,89 @@
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from core.interfaces.audio_output import AudioOutput, AudioPlaybackRequest, AudioPlaybackResult
-from services.tts_service.service import TTSService, TTSRequest, build_tts_service
+from services.tts_service.service import TTSService, TTSRequest, TTSResponse, build_tts_service
 
 
 def _default_duration_ms(text: str) -> int:
     return max(400, len(text) * 45)
 
 
-class MockAudioOutput(AudioOutput):
+@dataclass
+class _PreparedPlayback:
+    request: AudioPlaybackRequest
+    output_type: str
+    duration_ms: int
+    metadata: Dict[str, Any]
+
+
+class _PreparedAudioDelegate:
+    output_type = "delegate"
+
+    def prepare_playback(self, request: AudioPlaybackRequest) -> _PreparedPlayback:
+        raise NotImplementedError
+
+    def start_prepared(self, prepared: _PreparedPlayback) -> AudioPlaybackResult:
+        raise NotImplementedError
+
+    def interrupt_prepared(self, prepared: _PreparedPlayback) -> Dict[str, Any]:
+        raise NotImplementedError
+
+
+class MockAudioOutput(AudioOutput, _PreparedAudioDelegate):
     output_type = "mock"
 
     def __init__(self, event_callback: Optional[Callable[[str], None]] = None) -> None:
         self._event_callback = event_callback
         self.history: List[AudioPlaybackResult] = []
+        self.interrupt_history: List[Dict[str, Any]] = []
 
-    def play_text(self, request: AudioPlaybackRequest) -> AudioPlaybackResult:
-        result = AudioPlaybackResult(
+    def prepare_playback(self, request: AudioPlaybackRequest) -> _PreparedPlayback:
+        return _PreparedPlayback(
+            request=request,
             output_type="mock",
-            playback_kind=request.playback_kind,
-            status="played",
-            text=request.text,
-            spot_id=request.spot_id,
-            spot_name=request.spot_name,
-            session_id=request.session_id,
+            duration_ms=_default_duration_ms(request.text),
             metadata={
                 **dict(request.metadata),
                 "estimated_duration_ms": _default_duration_ms(request.text),
             },
         )
+
+    def start_prepared(self, prepared: _PreparedPlayback) -> AudioPlaybackResult:
+        result = AudioPlaybackResult(
+            output_type="mock",
+            playback_kind=prepared.request.playback_kind,
+            status="played",
+            text=prepared.request.text,
+            spot_id=prepared.request.spot_id,
+            spot_name=prepared.request.spot_name,
+            session_id=prepared.request.session_id,
+            metadata={
+                **dict(prepared.metadata),
+                "start_hook_invoked": True,
+            },
+        )
         self.history.append(result)
         if self._event_callback is not None:
-            label = request.spot_name or request.spot_id or "tour"
-            self._event_callback(f"[AUDIO] {request.playback_kind} via mock: {label}")
+            label = prepared.request.spot_name or prepared.request.spot_id or "tour"
+            self._event_callback(f"[AUDIO] {prepared.request.playback_kind} via mock: {label}")
         return result
+
+    def interrupt_prepared(self, prepared: _PreparedPlayback) -> Dict[str, Any]:
+        payload = {
+            "interrupt_hook_invoked": True,
+            "interrupt_status": "mock_interrupted",
+            "playback_kind": prepared.request.playback_kind,
+            "spot_id": prepared.request.spot_id,
+        }
+        self.interrupt_history.append(payload)
+        return payload
+
+    def play_text(self, request: AudioPlaybackRequest) -> AudioPlaybackResult:
+        prepared = self.prepare_playback(request)
+        return self.start_prepared(prepared)
 
     def get_playback_state(self) -> Dict[str, Any]:
         return {
@@ -46,23 +94,45 @@ class MockAudioOutput(AudioOutput):
         }
 
 
-class SilentAudioOutput(AudioOutput):
+class SilentAudioOutput(AudioOutput, _PreparedAudioDelegate):
     output_type = "silent"
 
-    def play_text(self, request: AudioPlaybackRequest) -> AudioPlaybackResult:
-        return AudioPlaybackResult(
+    def prepare_playback(self, request: AudioPlaybackRequest) -> _PreparedPlayback:
+        return _PreparedPlayback(
+            request=request,
             output_type="silent",
-            playback_kind=request.playback_kind,
-            status="skipped",
-            text=request.text,
-            spot_id=request.spot_id,
-            spot_name=request.spot_name,
-            session_id=request.session_id,
+            duration_ms=0,
             metadata={
                 **dict(request.metadata),
                 "estimated_duration_ms": 0,
             },
         )
+
+    def start_prepared(self, prepared: _PreparedPlayback) -> AudioPlaybackResult:
+        return AudioPlaybackResult(
+            output_type="silent",
+            playback_kind=prepared.request.playback_kind,
+            status="skipped",
+            text=prepared.request.text,
+            spot_id=prepared.request.spot_id,
+            spot_name=prepared.request.spot_name,
+            session_id=prepared.request.session_id,
+            metadata={
+                **dict(prepared.metadata),
+                "start_hook_invoked": False,
+            },
+        )
+
+    def interrupt_prepared(self, prepared: _PreparedPlayback) -> Dict[str, Any]:
+        return {
+            "interrupt_hook_invoked": False,
+            "interrupt_status": "silent_noop",
+            "playback_kind": prepared.request.playback_kind,
+        }
+
+    def play_text(self, request: AudioPlaybackRequest) -> AudioPlaybackResult:
+        prepared = self.prepare_playback(request)
+        return self.start_prepared(prepared)
 
     def get_playback_state(self) -> Dict[str, Any]:
         return {
@@ -73,15 +143,16 @@ class SilentAudioOutput(AudioOutput):
         }
 
 
-class ServiceBackedTTSAudioOutput(AudioOutput):
+class ServiceBackedTTSAudioOutput(AudioOutput, _PreparedAudioDelegate):
     output_type = "tts_service"
 
     def __init__(self, tts_service: TTSService, event_callback: Optional[Callable[[str], None]] = None) -> None:
         self._tts_service = tts_service
         self._event_callback = event_callback
         self.history: List[AudioPlaybackResult] = []
+        self.interrupt_history: List[Dict[str, Any]] = []
 
-    def play_text(self, request: AudioPlaybackRequest) -> AudioPlaybackResult:
+    def prepare_playback(self, request: AudioPlaybackRequest) -> _PreparedPlayback:
         synthesis = self._tts_service.synthesize(
             TTSRequest(
                 text=request.text,
@@ -92,22 +163,48 @@ class ServiceBackedTTSAudioOutput(AudioOutput):
                 metadata=dict(request.metadata),
             )
         )
+        return _PreparedPlayback(
+            request=request,
+            output_type="tts_service",
+            duration_ms=int(synthesis.estimated_duration_ms),
+            metadata=synthesis.to_metadata_dict(),
+        )
+
+    def start_prepared(self, prepared: _PreparedPlayback) -> AudioPlaybackResult:
         result = AudioPlaybackResult(
             output_type="tts_service",
-            playback_kind=request.playback_kind,
+            playback_kind=prepared.request.playback_kind,
             status="played",
-            text=request.text,
-            spot_id=request.spot_id,
-            spot_name=request.spot_name,
-            session_id=request.session_id,
-            metadata=synthesis.to_metadata_dict(),
+            text=prepared.request.text,
+            spot_id=prepared.request.spot_id,
+            spot_name=prepared.request.spot_name,
+            session_id=prepared.request.session_id,
+            metadata={
+                **dict(prepared.metadata),
+                "start_hook_invoked": True,
+            },
         )
         self.history.append(result)
         if self._event_callback is not None:
-            label = request.spot_name or request.spot_id or "tour"
-            backend_type = synthesis.backend_type
-            self._event_callback(f"[AUDIO] {request.playback_kind} via tts_service/{backend_type}: {label}")
+            label = prepared.request.spot_name or prepared.request.spot_id or "tour"
+            backend_type = prepared.metadata.get("backend_type", "unknown")
+            self._event_callback(f"[AUDIO] {prepared.request.playback_kind} via tts_service/{backend_type}: {label}")
         return result
+
+    def interrupt_prepared(self, prepared: _PreparedPlayback) -> Dict[str, Any]:
+        payload = {
+            "interrupt_hook_invoked": True,
+            "interrupt_status": "service_tts_interrupted",
+            "backend_type": prepared.metadata.get("backend_type"),
+            "playback_kind": prepared.request.playback_kind,
+            "spot_id": prepared.request.spot_id,
+        }
+        self.interrupt_history.append(payload)
+        return payload
+
+    def play_text(self, request: AudioPlaybackRequest) -> AudioPlaybackResult:
+        prepared = self.prepare_playback(request)
+        return self.start_prepared(prepared)
 
     def get_playback_state(self) -> Dict[str, Any]:
         return {
@@ -121,7 +218,7 @@ class ServiceBackedTTSAudioOutput(AudioOutput):
 class ManagedAudioOutput(AudioOutput):
     def __init__(
         self,
-        delegate: AudioOutput,
+        delegate: _PreparedAudioDelegate,
         clock: Optional[Callable[[], float]] = None,
         recent_event_limit: int = 10,
     ) -> None:
@@ -149,6 +246,7 @@ class ManagedAudioOutput(AudioOutput):
             "spot_name": item["spot_name"],
             "session_id": item["session_id"],
             "requested_at_monotonic": item["requested_at_monotonic"],
+            "prepared_at_monotonic": item["prepared_at_monotonic"],
             "started_at_monotonic": item.get("started_at_monotonic"),
             "duration_ms": item["duration_ms"],
             "remaining_ms": remaining_ms,
@@ -171,11 +269,18 @@ class ManagedAudioOutput(AudioOutput):
         self._recent_events = self._recent_events[-self._recent_event_limit :]
 
     def _start_item(self, item: Dict[str, Any], now: float) -> None:
+        delegate_result = self._delegate.start_prepared(item["prepared"])
+        item["metadata"] = dict(delegate_result.metadata)
         item["status"] = "playing"
         item["started_at_monotonic"] = now
         item["finish_at"] = now + (item["duration_ms"] / 1000.0)
         self._active_playback = item
-        self._record_event("playback_started", item, now)
+        self._record_event(
+            "playback_started",
+            item,
+            now,
+            extra={"start_status": delegate_result.status},
+        )
 
     def _complete_expired_playback(self, now: float) -> None:
         while self._active_playback is not None and self._active_playback["finish_at"] <= now:
@@ -192,47 +297,62 @@ class ManagedAudioOutput(AudioOutput):
     def _refresh_state(self) -> None:
         self._complete_expired_playback(self._clock())
 
-    def _item_from_result(self, result: AudioPlaybackResult) -> Dict[str, Any]:
+    def _item_from_prepared(self, prepared: _PreparedPlayback, now: float) -> Dict[str, Any]:
         playback_id = f"audio-{self._next_playback_id}"
         self._next_playback_id += 1
-        metadata = dict(result.metadata)
-        duration_ms = int(metadata.get("estimated_duration_ms", _default_duration_ms(result.text)))
+        metadata = dict(prepared.metadata)
+        duration_ms = int(metadata.get("estimated_duration_ms", prepared.duration_ms or _default_duration_ms(prepared.request.text)))
         return {
             "playback_id": playback_id,
-            "output_type": result.output_type,
-            "playback_kind": result.playback_kind,
-            "status": "pending",
-            "text": result.text,
-            "spot_id": result.spot_id,
-            "spot_name": result.spot_name,
-            "session_id": result.session_id,
-            "requested_at_monotonic": self._clock(),
+            "prepared": prepared,
+            "output_type": prepared.output_type,
+            "playback_kind": prepared.request.playback_kind,
+            "status": "prepared",
+            "text": prepared.request.text,
+            "spot_id": prepared.request.spot_id,
+            "spot_name": prepared.request.spot_name,
+            "session_id": prepared.request.session_id,
+            "requested_at_monotonic": now,
+            "prepared_at_monotonic": now,
             "started_at_monotonic": None,
             "finish_at": None,
             "duration_ms": duration_ms,
             "metadata": metadata,
         }
 
+    def _interrupt_active(self, replacement_item: Dict[str, Any], now: float) -> Optional[str]:
+        if self._active_playback is None:
+            return None
+        interrupted = self._active_playback
+        interrupt_payload = self._delegate.interrupt_prepared(interrupted["prepared"])
+        interrupted["status"] = "interrupted"
+        self._record_event(
+            "playback_interrupted",
+            interrupted,
+            now,
+            extra={
+                "replaced_by_playback_id": replacement_item["playback_id"],
+                **interrupt_payload,
+            },
+        )
+        self._active_playback = None
+        return interrupted["playback_id"]
+
     def play_text(self, request: AudioPlaybackRequest) -> AudioPlaybackResult:
         self._refresh_state()
-        delegate_result = self._delegate.play_text(request)
-        item = self._item_from_result(delegate_result)
         now = self._clock()
+        prepared = self._delegate.prepare_playback(request)
+        item = self._item_from_prepared(prepared, now)
+        self._record_event("playback_prepared", item, now)
+
         lifecycle_action = "started"
         replaced_playback_id = None
+        returned_status = "started"
 
         if self._active_playback is None:
             self._start_item(item, now)
         elif request.playback_kind == "answer":
-            replaced_playback_id = self._active_playback["playback_id"]
-            interrupted = self._active_playback
-            interrupted["status"] = "interrupted"
-            self._record_event(
-                "playback_interrupted",
-                interrupted,
-                now,
-                extra={"replaced_by_playback_id": item["playback_id"]},
-            )
+            replaced_playback_id = self._interrupt_active(item, now)
             self._start_item(item, now)
             lifecycle_action = "replaced_active"
         else:
@@ -240,22 +360,26 @@ class ManagedAudioOutput(AudioOutput):
             self._queued_playbacks.append(item)
             self._record_event("playback_queued", item, now)
             lifecycle_action = "queued"
+            returned_status = "prepared"
 
         merged_metadata = {
-            **dict(delegate_result.metadata),
+            **dict(item["metadata"]),
             "estimated_duration_ms": item["duration_ms"],
             "lifecycle_action": lifecycle_action,
             "playback_id": item["playback_id"],
             "replaced_playback_id": replaced_playback_id,
+            "prepared_at_monotonic": item["prepared_at_monotonic"],
+            "started_at_monotonic": item["started_at_monotonic"],
+            "start_hook_invoked": item["started_at_monotonic"] is not None,
         }
         return AudioPlaybackResult(
-            output_type=delegate_result.output_type,
-            playback_kind=delegate_result.playback_kind,
-            status=delegate_result.status,
-            text=delegate_result.text,
-            spot_id=delegate_result.spot_id,
-            spot_name=delegate_result.spot_name,
-            session_id=delegate_result.session_id,
+            output_type=item["output_type"],
+            playback_kind=item["playback_kind"],
+            status=returned_status,
+            text=item["text"],
+            spot_id=item["spot_id"],
+            spot_name=item["spot_name"],
+            session_id=item["session_id"],
             metadata=merged_metadata,
         )
 

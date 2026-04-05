@@ -414,6 +414,12 @@ Chosen policy:
 - narration requests queue in FIFO order when something is already active
 - answer requests interrupt and replace the active playback immediately
 
+Lifecycle model:
+- request accepted and prepared
+- playback started
+- playback interrupted or replaced
+- playback completed
+
 Observable runtime state:
 - `audio_playback_state.policy_name`
 - `audio_playback_state.active_playback`
@@ -426,9 +432,9 @@ python scripts/run_audio_overlap_demo.py
 ```
 
 What you should see:
-- first narration starts
-- second narration is reported as `queued`
-- answer is reported as `replaced_active`
+- first narration is `prepared` and then `started`
+- second narration is `prepared` and then `queued` with `start_hook_invoked: false`
+- answer is `prepared`, then `replaced_active`, and the active narration emits a `playback_interrupted` event
 
 Focused policy doc:
 - `docs/AUDIO_PLAYBACK_POLICY.md`

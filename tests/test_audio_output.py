@@ -74,14 +74,17 @@ class AudioOutputTests(unittest.TestCase):
             )
 
             self.assertEqual(result.output_type, "tts_service")
+            self.assertEqual(result.status, "started")
             self.assertEqual(result.metadata["backend_type"], "mock")
             self.assertEqual(result.metadata["status"], "synthesized")
             self.assertTrue(Path(result.metadata["artifact"]["artifact_uri"]).exists())
             self.assertEqual(result.metadata["lifecycle_action"], "started")
+            self.assertTrue(result.metadata["start_hook_invoked"])
 
     def test_managed_audio_output_queues_second_narration(self) -> None:
         clock = _FakeClock()
-        output = ManagedAudioOutput(MockAudioOutput(), clock=clock)
+        delegate = MockAudioOutput()
+        output = ManagedAudioOutput(delegate, clock=clock)
 
         first = output.play_text(
             AudioPlaybackRequest(text="first narration", playback_kind="narration", spot_id="gate")
@@ -91,20 +94,28 @@ class AudioOutputTests(unittest.TestCase):
         )
         playback_state = output.get_playback_state()
 
+        self.assertEqual(first.status, "started")
         self.assertEqual(first.metadata["lifecycle_action"], "started")
+        self.assertEqual(second.status, "prepared")
         self.assertEqual(second.metadata["lifecycle_action"], "queued")
+        self.assertFalse(second.metadata["start_hook_invoked"])
+        self.assertEqual(len(delegate.history), 1)
         self.assertEqual(playback_state["active_playback"]["spot_id"], "gate")
         self.assertEqual(len(playback_state["queued_playbacks"]), 1)
         self.assertEqual(playback_state["queued_playbacks"][0]["spot_id"], "plaza")
+        self.assertEqual(playback_state["queued_playbacks"][0]["status"], "queued")
 
         clock.advance(5.0)
         playback_state = output.get_playback_state()
+        self.assertEqual(len(delegate.history), 2)
         self.assertEqual(playback_state["active_playback"]["spot_id"], "plaza")
+        self.assertEqual(playback_state["active_playback"]["status"], "playing")
         self.assertEqual(len(playback_state["queued_playbacks"]), 0)
 
     def test_managed_audio_output_interrupts_active_playback_for_answer(self) -> None:
         clock = _FakeClock()
-        output = ManagedAudioOutput(MockAudioOutput(), clock=clock)
+        delegate = MockAudioOutput()
+        output = ManagedAudioOutput(delegate, clock=clock)
 
         first = output.play_text(
             AudioPlaybackRequest(text="long narration", playback_kind="narration", spot_id="gallery")
@@ -114,11 +125,16 @@ class AudioOutputTests(unittest.TestCase):
         )
         playback_state = output.get_playback_state()
 
+        self.assertEqual(answer.status, "started")
         self.assertEqual(first.metadata["lifecycle_action"], "started")
         self.assertEqual(answer.metadata["lifecycle_action"], "replaced_active")
         self.assertEqual(answer.metadata["replaced_playback_id"], first.metadata["playback_id"])
+        self.assertTrue(answer.metadata["start_hook_invoked"])
+        self.assertEqual(len(delegate.interrupt_history), 1)
+        self.assertTrue(delegate.interrupt_history[0]["interrupt_hook_invoked"])
         self.assertEqual(playback_state["active_playback"]["playback_kind"], "answer")
         recent_event_types = [item["event_type"] for item in playback_state["recent_events"]]
+        self.assertIn("playback_prepared", recent_event_types)
         self.assertIn("playback_interrupted", recent_event_types)
 
     def test_orchestrator_routes_narration_and_answer_through_audio_output(self) -> None:
@@ -186,6 +202,8 @@ class AudioOutputTests(unittest.TestCase):
             state["audio_playback_state"]["policy_name"],
             "answers_interrupt_active_playback__narration_queues_fifo",
         )
+        self.assertEqual(state["last_audio_playback"]["extra"]["status"], "started")
+        self.assertTrue(state["last_audio_playback"]["extra"]["metadata"]["start_hook_invoked"])
         self.assertEqual(session_summary["latest_audio_playback"]["extra"]["output_type"], "tts_service")
         self.assertEqual(
             session_summary["latest_audio_playback"]["extra"]["metadata"]["backend_type"],
