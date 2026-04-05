@@ -21,6 +21,10 @@ Demo script:
 Config:
 - `configs/sim.yaml`
 
+HTTP bridge:
+- `services/sim_pose_ingress/app.py`
+- `docs/SIM_POSE_HTTP_BRIDGE.md`
+
 ## Payload Contract
 
 Each externally supplied pose payload uses this shape:
