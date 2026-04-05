@@ -170,6 +170,7 @@ See also:
 - `docs/DEPLOYMENT_READINESS_CONTRACT.md`
 - `docs/DEPLOYMENT_COMMAND_MANIFEST_CONTRACT.md`
 - `docs/DEPLOYMENT_VERIFICATION_MANIFEST_CONTRACT.md`
+- `docs/DEPLOYMENT_VERIFICATION_RUNNER_CONTRACT.md`
 
 ---
 
@@ -297,6 +298,18 @@ Current repo-owned post-start verification checks are now also available through
 - `python scripts/print_verification_sheet.py --config configs/<profile>.yaml`
 
 This verification-manifest layer is where repo-owned services become explicit endpoint/status checks versus manual/external steps that still have no repo verification contract.
+
+Current one-shot verification execution is now also available through:
+
+- `python scripts/run_verification_summary.py --config configs/<profile>.yaml`
+
+This runner executes repo-owned verification checks once and reports:
+
+- passed checks
+- failed checks
+- manual/non-repo steps that were skipped
+
+It does not wait, retry, or supervise services.
 
 ### Current Startup Order Summary
 

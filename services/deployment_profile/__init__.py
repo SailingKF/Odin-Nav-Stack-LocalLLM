@@ -10,6 +10,10 @@ from services.deployment_profile.verification_manifest import (
     build_bringup_verification_sheet,
     build_deployment_verification_manifest,
 )
+from services.deployment_profile.verification_runner import (
+    build_verification_result_summary,
+    run_deployment_verification_once,
+)
 
 __all__ = [
     "build_deployment_profile",
@@ -20,4 +24,6 @@ __all__ = [
     "build_guided_bringup_sheet",
     "build_deployment_verification_manifest",
     "build_bringup_verification_sheet",
+    "run_deployment_verification_once",
+    "build_verification_result_summary",
 ]

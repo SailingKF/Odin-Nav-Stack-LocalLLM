@@ -23,6 +23,10 @@ Current runtime-facing exposure:
 
 - `deployment_verification_manifest`
 
+Related one-shot execution layer:
+
+- `services/deployment_profile/verification_runner.py`
+
 ## Current Top-Level Surface
 
 The verification manifest exposes:
@@ -180,3 +184,7 @@ It only centralizes:
 - repo-owned post-start success checks
 - verification-to-step mapping
 - operator-facing bring-up verification guidance
+
+For the one-shot execution and result-summary layer built on top of this manifest, see:
+
+- `docs/DEPLOYMENT_VERIFICATION_RUNNER_CONTRACT.md`

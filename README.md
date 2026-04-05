@@ -765,6 +765,50 @@ What this still does not do:
 Focused contract doc:
 - `docs/DEPLOYMENT_VERIFICATION_MANIFEST_CONTRACT.md`
 
+## Deployment Verification Runner And Result Summary
+
+This iteration adds a narrow one-shot verification runner that executes the existing repo-owned verification manifest checks once and produces a concrete result summary.
+
+Current operator-facing entry point:
+- `python scripts/run_verification_summary.py --config configs/<profile>.yaml`
+
+What this makes easier to see:
+- which repo-owned verification checks passed
+- which checks failed because the target was unreachable
+- which checks failed because the response status was wrong
+- which checks failed because expected fields were missing
+- which steps were manual or external and therefore skipped
+
+Current result statuses:
+- `passed`
+- `failed_unreachable`
+- `failed_invalid_status`
+- `failed_missing_fields`
+- `failed_invalid_payload`
+- `failed_unsupported_kind`
+- `manual_external`
+- `manual_optional`
+
+Current overall summary statuses:
+- `passed`
+- `failed`
+- `manual_only`
+
+Example usage:
+```shell
+python scripts/run_verification_summary.py --config configs/dev.yaml
+python scripts/run_verification_summary.py --config configs/edge.yaml --timeout-sec 1.5
+```
+
+What this still does not do:
+- start services
+- wait until services become healthy
+- retry checks
+- poll continuously
+
+Focused contract doc:
+- `docs/DEPLOYMENT_VERIFICATION_RUNNER_CONTRACT.md`
+
 How to validate the service-backed path:
 ```shell
 python scripts/run_mock_tour.py
