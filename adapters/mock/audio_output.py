@@ -32,6 +32,9 @@ class _PreparedAudioDelegate:
     def interrupt_prepared(self, prepared: _PreparedPlayback) -> Dict[str, Any]:
         raise NotImplementedError
 
+    def get_completion_state(self, prepared: _PreparedPlayback) -> Optional[Dict[str, Any]]:
+        return None
+
 
 class MockAudioOutput(AudioOutput, _PreparedAudioDelegate):
     output_type = "mock"
@@ -193,6 +196,7 @@ class ServiceBackedTTSAudioOutput(AudioOutput, _PreparedAudioDelegate):
                 metadata={
                     "tts_backend_type": prepared.metadata.get("tts_backend_type", prepared.metadata.get("backend_type")),
                     "tts_status": prepared.metadata.get("tts_status", prepared.metadata.get("status")),
+                    "estimated_duration_ms": prepared.metadata.get("estimated_duration_ms", prepared.duration_ms),
                 },
             )
         )
@@ -200,6 +204,9 @@ class ServiceBackedTTSAudioOutput(AudioOutput, _PreparedAudioDelegate):
             **dict(prepared.metadata),
             "playback_backend_type": playback_handle.backend_type,
             "playback_handle": playback_handle.to_metadata_dict(),
+            "playback_completion_supported": True,
+            "playback_completion_source": None,
+            "latest_playback_handle_status": "active",
             "player_start_hook_invoked": True,
             "player_status": playback_handle.status,
         }
@@ -262,6 +269,54 @@ class ServiceBackedTTSAudioOutput(AudioOutput, _PreparedAudioDelegate):
         }
         self.interrupt_history.append(payload)
         return payload
+
+    def get_completion_state(self, prepared: _PreparedPlayback) -> Optional[Dict[str, Any]]:
+        handle_metadata = dict(prepared.metadata.get("playback_handle") or {})
+        if not handle_metadata:
+            return {
+                "completion_supported": False,
+                "completion_reported": False,
+                "completion_source": None,
+                "metadata_updates": {
+                    "playback_completion_supported": False,
+                    "playback_completion_source": None,
+                    "latest_playback_handle_status": None,
+                },
+            }
+
+        observation = self._artifact_player_backend.get_handle_state(
+            ArtifactPlaybackHandle(
+                backend_type=str(handle_metadata.get("backend_type")),
+                handle_id=str(handle_metadata.get("handle_id")),
+                status=str(handle_metadata.get("status")),
+                artifact_uri=str(handle_metadata.get("artifact_uri")),
+                artifact_kind=str(handle_metadata.get("artifact_kind")),
+                mime_type=str(handle_metadata.get("mime_type")),
+                content_hash=handle_metadata.get("content_hash"),
+                playback_kind=str(handle_metadata.get("playback_kind")),
+                session_id=handle_metadata.get("session_id"),
+                spot_id=handle_metadata.get("spot_id"),
+                spot_name=handle_metadata.get("spot_name"),
+                metadata=dict(handle_metadata.get("metadata") or {}),
+            )
+        )
+        return {
+            "completion_supported": True,
+            "completion_reported": observation.status == "completed",
+            "completion_source": "backend_reported" if observation.status == "completed" else None,
+            "latest_handle_status": observation.status,
+            "observation": observation.to_metadata_dict(),
+            "metadata_updates": {
+                "playback_handle": {
+                    **handle_metadata,
+                    "status": observation.status,
+                },
+                "playback_completion_supported": True,
+                "playback_completion_source": "backend_reported" if observation.status == "completed" else None,
+                "latest_playback_handle_status": observation.status,
+                "playback_completion_observation": observation.to_metadata_dict(),
+            },
+        }
 
     def play_text(self, request: AudioPlaybackRequest) -> AudioPlaybackResult:
         prepared = self.prepare_playback(request)
@@ -329,6 +384,27 @@ class ManagedAudioOutput(AudioOutput):
         self._recent_events.append(payload)
         self._recent_events = self._recent_events[-self._recent_event_limit :]
 
+    def _complete_item(self, item: Dict[str, Any], now: float, completion_source: str, extra: Optional[Dict[str, Any]] = None) -> None:
+        item["status"] = "completed"
+        item["metadata"] = {
+            **dict(item["metadata"]),
+            "playback_completion_source": completion_source,
+        }
+        self._record_event(
+            "playback_completed",
+            item,
+            now,
+            extra={
+                "completion_source": completion_source,
+                "latest_playback_handle_status": item["metadata"].get("latest_playback_handle_status"),
+                **(extra or {}),
+            },
+        )
+        self._active_playback = None
+        if self._queued_playbacks:
+            next_item = self._queued_playbacks.pop(0)
+            self._start_item(next_item, now)
+
     def _start_item(self, item: Dict[str, Any], now: float) -> None:
         delegate_result = self._delegate.start_prepared(item["prepared"])
         item["metadata"] = dict(delegate_result.metadata)
@@ -344,16 +420,41 @@ class ManagedAudioOutput(AudioOutput):
         )
 
     def _complete_expired_playback(self, now: float) -> None:
-        while self._active_playback is not None and self._active_playback["finish_at"] <= now:
-            completed = self._active_playback
-            completed["status"] = "completed"
-            self._record_event("playback_completed", completed, now)
-            self._active_playback = None
-            if self._queued_playbacks:
-                next_item = self._queued_playbacks.pop(0)
-                self._start_item(next_item, now)
-            else:
-                break
+        while self._active_playback is not None:
+            active = self._active_playback
+            completion_state = self._delegate.get_completion_state(active["prepared"])
+            if completion_state is not None:
+                active["metadata"] = {
+                    **dict(active["metadata"]),
+                    **dict(completion_state.get("metadata_updates") or {}),
+                }
+                if completion_state.get("completion_reported"):
+                    self._complete_item(
+                        active,
+                        now,
+                        completion_source=str(completion_state.get("completion_source") or "backend_reported"),
+                        extra={
+                            "completion_supported": bool(completion_state.get("completion_supported")),
+                            "player_completion_hook_invoked": True,
+                            "playback_completion_observation": completion_state.get("observation"),
+                        },
+                    )
+                    continue
+                if completion_state.get("completion_supported"):
+                    break
+
+            if active["finish_at"] is not None and active["finish_at"] <= now:
+                self._complete_item(
+                    active,
+                    now,
+                    completion_source="estimated_fallback",
+                    extra={
+                        "completion_supported": False,
+                        "player_completion_hook_invoked": False,
+                    },
+                )
+                continue
+            break
 
     def _refresh_state(self) -> None:
         self._complete_expired_playback(self._clock())

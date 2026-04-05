@@ -1,3 +1,4 @@
+import time
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, List, Optional
@@ -36,6 +37,20 @@ class ArtifactPlaybackHandle:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class ArtifactPlaybackObservation:
+    backend_type: str
+    handle_id: str
+    status: str
+    completion_supported: bool
+    observed_at_monotonic: Optional[float] = None
+    completed_at_monotonic: Optional[float] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_metadata_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
 class ArtifactPlayerBackend(ABC):
     @abstractmethod
     def start_artifact(self, request: ArtifactPlaybackRequest) -> ArtifactPlaybackHandle:
@@ -45,15 +60,25 @@ class ArtifactPlayerBackend(ABC):
     def interrupt_handle(self, handle: ArtifactPlaybackHandle) -> Dict[str, Any]:
         """Interrupt a previously started artifact playback handle."""
 
+    @abstractmethod
+    def get_handle_state(self, handle: ArtifactPlaybackHandle) -> ArtifactPlaybackObservation:
+        """Return the latest observable playback state for a started handle."""
+
 
 class MockArtifactPlayerBackend(ArtifactPlayerBackend):
     backend_type = "mock_artifact_player"
 
-    def __init__(self, event_callback: Optional[Callable[[str], None]] = None) -> None:
+    def __init__(
+        self,
+        event_callback: Optional[Callable[[str], None]] = None,
+        clock: Optional[Callable[[], float]] = None,
+    ) -> None:
         self._event_callback = event_callback
+        self._clock = clock or time.monotonic
         self.start_history: List[ArtifactPlaybackHandle] = []
         self.interrupt_history: List[Dict[str, Any]] = []
         self._next_handle_id = 1
+        self._handle_runtime_state: Dict[str, Dict[str, Any]] = {}
 
     def start_artifact(self, request: ArtifactPlaybackRequest) -> ArtifactPlaybackHandle:
         handle = ArtifactPlaybackHandle(
@@ -72,12 +97,24 @@ class MockArtifactPlayerBackend(ArtifactPlayerBackend):
         )
         self._next_handle_id += 1
         self.start_history.append(handle)
+        self._handle_runtime_state[handle.handle_id] = {
+            "handle": handle,
+            "status": "active",
+            "started_at_monotonic": self._clock(),
+            "completed_at_monotonic": None,
+            "interrupted_at_monotonic": None,
+            "expected_duration_ms": int(request.metadata.get("estimated_duration_ms", 0)),
+        }
         if self._event_callback is not None:
             label = request.spot_name or request.spot_id or "tour"
             self._event_callback(f"[AUDIO] {request.playback_kind} via artifact_player/mock: {label}")
         return handle
 
     def interrupt_handle(self, handle: ArtifactPlaybackHandle) -> Dict[str, Any]:
+        state = self._handle_runtime_state.get(handle.handle_id)
+        if state is not None:
+            state["status"] = "interrupted"
+            state["interrupted_at_monotonic"] = self._clock()
         payload = {
             "playback_backend_type": handle.backend_type,
             "playback_handle_id": handle.handle_id,
@@ -86,6 +123,42 @@ class MockArtifactPlayerBackend(ArtifactPlayerBackend):
         }
         self.interrupt_history.append(payload)
         return payload
+
+    def get_handle_state(self, handle: ArtifactPlaybackHandle) -> ArtifactPlaybackObservation:
+        state = self._handle_runtime_state.get(handle.handle_id)
+        now = self._clock()
+        if state is None:
+            return ArtifactPlaybackObservation(
+                backend_type=handle.backend_type,
+                handle_id=handle.handle_id,
+                status="unknown",
+                completion_supported=True,
+                observed_at_monotonic=now,
+                metadata={"reason": "missing_handle_state"},
+            )
+
+        if state["status"] == "active":
+            expected_duration_ms = int(state.get("expected_duration_ms", 0))
+            started_at = state.get("started_at_monotonic")
+            if expected_duration_ms > 0 and started_at is not None:
+                elapsed_ms = int((now - started_at) * 1000)
+                if elapsed_ms >= expected_duration_ms:
+                    state["status"] = "completed"
+                    state["completed_at_monotonic"] = now
+
+        return ArtifactPlaybackObservation(
+            backend_type=handle.backend_type,
+            handle_id=handle.handle_id,
+            status=str(state["status"]),
+            completion_supported=True,
+            observed_at_monotonic=now,
+            completed_at_monotonic=state.get("completed_at_monotonic"),
+            metadata={
+                "expected_duration_ms": state.get("expected_duration_ms"),
+                "started_at_monotonic": state.get("started_at_monotonic"),
+                "interrupted_at_monotonic": state.get("interrupted_at_monotonic"),
+            },
+        )
 
 
 def build_artifact_player_backend(

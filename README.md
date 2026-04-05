@@ -420,6 +420,29 @@ What runtime and session metadata now show:
   - `player_start_hook_invoked`
   - `player_interrupt_hook_invoked`
 
+## Playback Completion Signal Baseline
+
+This iteration adds a backend-side completion reporting seam so service-backed playback no longer relies only on estimated duration inside the lifecycle manager.
+
+What is included:
+- playback backend state polling through `get_handle_state(...)`
+- service-backed completion rollover driven by backend-reported handle status
+- estimated fallback completion for modes that do not expose backend-side completion
+
+What runtime metadata now makes visible:
+- `playback_completion_supported`
+- `playback_completion_source`
+- `latest_playback_handle_status`
+- `playback_completion_observation`
+
+What `playback_completed` events now distinguish:
+- `completion_source: "backend_reported"`
+- `completion_source: "estimated_fallback"`
+
+Focused contract docs:
+- `docs/ARTIFACT_PLAYER_BACKEND.md`
+- `docs/AUDIO_PLAYBACK_POLICY.md`
+
 Focused contract docs:
 - `docs/TTS_SERVICE_CONTRACT.md`
 - `docs/ARTIFACT_PLAYER_BACKEND.md`

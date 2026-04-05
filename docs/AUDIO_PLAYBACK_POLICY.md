@@ -61,6 +61,8 @@ For service-backed playback, actual artifact start / interrupt hooks now live be
 
 - `adapters/mock/artifact_player.py`
 
+Service-backed completion polling now also lives behind that playback backend seam.
+
 ## Where Preparation Ends And Playback Start Begins
 
 Preparation now means:
@@ -94,6 +96,12 @@ Interruption now means:
 - for service-backed playback, that path calls the artifact player backend `interrupt_handle(...)`
 - a `playback_interrupted` event is recorded
 - a replacement item may then start immediately
+
+Completion now means:
+
+- service-backed playback first consults backend-side handle state
+- if the playback backend reports `completed`, queue rollover happens from that signal
+- modes without backend-side completion reporting still use estimated-duration fallback
 
 ## Observable Runtime State
 
@@ -130,6 +138,9 @@ Service-backed metadata now distinguishes:
   - `playback_backend_type`
   - `playback_handle`
   - `player_start_hook_invoked`
+  - `playback_completion_supported`
+  - `playback_completion_source`
+  - `latest_playback_handle_status`
 
 Lifecycle events now include:
 
@@ -139,9 +150,14 @@ Lifecycle events now include:
 - `playback_interrupted`
 - `playback_completed`
 
+`playback_completed` now distinguishes:
+
+- `completion_source: "backend_reported"`
+- `completion_source: "estimated_fallback"`
+
 ## What Still Remains Before Real Backend Playback Control
 
 - true device-level start/stop control
 - real interruption of an engine that is already emitting audio
-- synchronization between synthesis completion and playback completion
+- synchronization between real engine completion and the backend polling contract
 - queue persistence and recovery rules

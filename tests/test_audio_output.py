@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from adapters.mock.artifact_player import MockArtifactPlayerBackend
 from adapters.mock.audio_output import ManagedAudioOutput, MockAudioOutput, ServiceBackedTTSAudioOutput, SilentAudioOutput, build_audio_output
 from core.interfaces.audio_output import AudioPlaybackRequest
 from core.interfaces.pose_provider import Pose2D
@@ -10,6 +11,7 @@ from core.poi.loader import load_pois, load_route
 from core.poi.store import InMemoryPoiStore
 from core.session.logger import JsonlSessionStore
 from core.tour_orchestrator.orchestrator import TourOrchestrator
+from services.tts_service.service import build_tts_service
 
 
 class _FakeClock:
@@ -115,6 +117,47 @@ class AudioOutputTests(unittest.TestCase):
         self.assertEqual(playback_state["active_playback"]["spot_id"], "plaza")
         self.assertEqual(playback_state["active_playback"]["status"], "playing")
         self.assertEqual(len(playback_state["queued_playbacks"]), 0)
+        completed_events = [item for item in playback_state["recent_events"] if item["event_type"] == "playback_completed"]
+        self.assertGreaterEqual(len(completed_events), 1)
+        self.assertEqual(completed_events[-1]["extra"]["completion_source"], "estimated_fallback")
+
+    def test_service_backed_queue_rollover_uses_backend_reported_completion(self) -> None:
+        clock = _FakeClock()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config = {
+                "audio_output_type": "tts_service",
+                "tts_backend_type": "mock",
+                "artifact_player_backend_type": "mock",
+                "tts_artifact_dir": str(Path(temp_dir) / "tts_artifacts"),
+            }
+            delegate = ServiceBackedTTSAudioOutput(
+                tts_service=build_tts_service(config, repo_root=Path.cwd()),
+                artifact_player_backend=MockArtifactPlayerBackend(clock=clock),
+            )
+            output = ManagedAudioOutput(delegate, clock=clock)
+
+            first = output.play_text(
+                AudioPlaybackRequest(text="first narration for service path", playback_kind="narration", spot_id="gate")
+            )
+            second = output.play_text(
+                AudioPlaybackRequest(text="second narration for queue rollover", playback_kind="narration", spot_id="plaza")
+            )
+            initial_state = output.get_playback_state()
+
+            self.assertEqual(first.metadata["playback_backend_type"], "mock_artifact_player")
+            self.assertEqual(initial_state["active_playback"]["metadata"]["latest_playback_handle_status"], "active")
+            self.assertEqual(second.status, "prepared")
+
+            clock.advance(5.0)
+            playback_state = output.get_playback_state()
+
+        completed_events = [item for item in playback_state["recent_events"] if item["event_type"] == "playback_completed"]
+        self.assertGreaterEqual(len(completed_events), 1)
+        self.assertEqual(completed_events[-1]["extra"]["completion_source"], "backend_reported")
+        self.assertTrue(completed_events[-1]["extra"]["player_completion_hook_invoked"])
+        self.assertEqual(playback_state["active_playback"]["spot_id"], "plaza")
+        self.assertEqual(playback_state["active_playback"]["status"], "playing")
+        self.assertEqual(playback_state["active_playback"]["metadata"]["latest_playback_handle_status"], "active")
 
     def test_managed_audio_output_interrupts_active_playback_for_answer(self) -> None:
         clock = _FakeClock()

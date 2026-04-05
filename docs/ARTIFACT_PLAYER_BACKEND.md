@@ -30,6 +30,7 @@ The playback backend receives an already synthesized artifact and is responsible
 - starting playback for that artifact
 - returning observable playback-handle metadata
 - interrupting a previously started handle
+- reporting latest playback-handle state for completion polling
 
 Minimal start input:
 
@@ -60,6 +61,16 @@ Interruption returns:
 - `player_interrupt_hook_invoked`
 - `player_interrupt_status`
 
+Completion observation returns:
+
+- `backend_type`
+- `handle_id`
+- `status`
+- `completion_supported`
+- `observed_at_monotonic`
+- `completed_at_monotonic`
+- `metadata`
+
 ## Current Development Backend
 
 Current backend:
@@ -72,6 +83,10 @@ Behavior:
 - creates a development playback handle
 - emits a lightweight `[AUDIO] ...` trace only when playback actually starts
 - records explicit interrupt metadata when active playback is replaced
+- reports backend-side handle state as:
+  - `active`
+  - `completed`
+  - `interrupted`
 
 ## Ownership Split
 
@@ -106,6 +121,10 @@ Playback-side examples:
 - `playback_handle`
 - `player_start_hook_invoked`
 - `player_status`
+- `playback_completion_supported`
+- `playback_completion_source`
+- `latest_playback_handle_status`
+- `playback_completion_observation`
 
 Interruption events include:
 
@@ -113,6 +132,13 @@ Interruption events include:
 - `playback_handle_id`
 - `player_interrupt_hook_invoked`
 - `player_interrupt_status`
+
+Completion events now include:
+
+- `completion_source`
+- `latest_playback_handle_status`
+- `player_completion_hook_invoked`
+- `playback_completion_observation`
 
 ## Current Config Knob
 

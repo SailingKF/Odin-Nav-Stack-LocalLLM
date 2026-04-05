@@ -100,6 +100,12 @@ Playback backend details are defined in:
 
 - `docs/ARTIFACT_PLAYER_BACKEND.md`
 
+Completion ownership also remains outside the TTS service:
+
+- the TTS service does not report playback completion
+- the playback backend reports handle state
+- the audio-output lifecycle manager consumes that state and falls back to estimated completion only when no backend-side completion reporting exists
+
 ## Current Config Knobs
 
 Current config fields:
