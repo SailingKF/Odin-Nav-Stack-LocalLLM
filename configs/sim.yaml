@@ -29,3 +29,12 @@ publisher_frame_transform:
   scale: 1.0
   offset_x: 0.0
   offset_y: 0.0
+isaac_source:
+  mode: stub
+  stub_payload_file: content/sim/demo_isaac_stub_pose_stream.yaml
+  live:
+    robot_prim_path: /World/Robot/base_link
+    frame_id: odin/base_link
+    required_modules:
+      - omni.isaac.core
+      - omni.isaac.core.utils.stage

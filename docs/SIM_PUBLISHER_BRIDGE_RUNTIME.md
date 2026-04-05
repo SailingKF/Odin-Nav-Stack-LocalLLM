@@ -35,9 +35,10 @@ This is the plug-in point for a future Isaac implementation.
 An Isaac source should only need to implement `iter_payloads()` and emit richer simulator-side pose payloads.
 
 Isaac-oriented stub contract introduced later:
-- `services/sim_publisher_bridge/isaac_source.py`
+- `services/sim_publisher_bridge/isaac_contract.py`
 - `IsaacObservationSource`
 - `IsaacStubPoseSource`
+- `IsaacLiveObservationSource`
 
 That Isaac-oriented layer is the named adapter boundary for future direct Isaac work.
 It keeps Isaac-specific source semantics outside the generic publisher runtime while still adapting into the same richer payload contract.
@@ -76,6 +77,7 @@ That source should:
 With the explicit Isaac-oriented contract now present, a real implementation can also be shaped as:
 - an `IsaacObservationSource` implementation that reads live Isaac observations
 - wrapped by `IsaacStubPoseSource`-style adaptation into richer publisher payloads
+- or selected through config-driven wiring that points at the import-safe live adapter skeleton
 
 Everything downstream can stay the same:
 - projection

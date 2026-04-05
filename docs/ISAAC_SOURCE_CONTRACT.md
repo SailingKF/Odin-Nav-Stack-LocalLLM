@@ -14,7 +14,7 @@ The goal is to make future direct Isaac integration an adapter problem, not a re
 
 Isaac-oriented contract:
 
-- `services/sim_publisher_bridge/isaac_source.py`
+- `services/sim_publisher_bridge/isaac_contract.py`
 - `IsaacObservationSource`
 
 The contract exposes:
@@ -54,6 +54,7 @@ Stub implementation pieces:
 - `IterableIsaacObservationSource`
 - `YamlFileIsaacObservationSource`
 - `IsaacStubPoseSource`
+- `IsaacLiveObservationSource` is not part of the stub path, but it now targets the same contract through an import-safe live skeleton
 
 The first two expose Isaac-oriented observations.
 `IsaacStubPoseSource` then adapts those observations into the existing richer payload shape expected by `SimulatorPublisherBridgeRuntime`.
@@ -100,6 +101,7 @@ Future real Isaac behavior will still need:
 - ownership of sampling lifecycle
 - scene-specific mapping from Isaac world coordinates into the configured tour plane
 - stronger timing semantics if simulator replay or streaming cadence matters
+- filling in the current live skeleton in `services/sim_publisher_bridge/isaac_live.py`
 
 ## Validation Path
 
@@ -120,3 +122,16 @@ No changes were required in:
 - `core`
 - orchestrator
 - server-side sim ingress APIs
+
+## Live Skeleton Added Later
+
+The repository now also contains an import-safe live adapter skeleton:
+
+- `services/sim_publisher_bridge/isaac_live.py`
+
+That path:
+
+- targets the same `IsaacObservationSource` contract
+- reports dependency availability without importing Isaac during normal repository use
+- raises clear runtime errors when Isaac packages are unavailable
+- still leaves actual live simulator sampling as future work
