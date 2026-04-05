@@ -39,6 +39,7 @@ Current development implementation:
 - `adapters/mock/audio_output.py`
 - `MockAudioOutput`
 - `SilentAudioOutput`
+- `ServiceBackedTTSAudioOutput`
 
 Current behaviors:
 
@@ -51,6 +52,10 @@ Current behaviors:
   - reports `output_type: silent`
   - returns `status: skipped`
   - keeps the orchestration path intact without audible playback
+- `ServiceBackedTTSAudioOutput`
+  - reports `output_type: tts_service`
+  - routes synthesis through `services/tts_service/`
+  - returns artifact-aware metadata from the active TTS backend
 
 ## Current Wiring
 
@@ -90,3 +95,7 @@ A future real TTS adapter still needs to decide:
 - interrupt / stop semantics
 - file or stream handling
 - device-specific output selection
+
+See also:
+
+- `docs/TTS_SERVICE_CONTRACT.md`

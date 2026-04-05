@@ -47,7 +47,7 @@ class MockTourApiRuntime:
         pose_provider = MockPoseProvider.from_route_pois(route_pois)
         session_store = JsonlSessionStore(str(self._session_log_dir))
         narrator = build_narrator(self._config)
-        audio_output = build_audio_output(self._config, event_callback=print)
+        audio_output = build_audio_output(self._config, event_callback=print, repo_root=self._repo_root)
 
         return TourOrchestrator(
             route_pois=route_pois,

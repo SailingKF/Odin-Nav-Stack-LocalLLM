@@ -49,7 +49,7 @@ class SimPoseIngressRuntime:
         pose_provider = ExternalPoseProvider()
         session_store = JsonlSessionStore(str(self._session_log_dir))
         narrator = build_narrator(self._config)
-        audio_output = build_audio_output(self._config, event_callback=print)
+        audio_output = build_audio_output(self._config, event_callback=print, repo_root=self._repo_root)
 
         self._pose_provider = pose_provider
         return TourOrchestrator(

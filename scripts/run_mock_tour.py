@@ -48,7 +48,7 @@ def main() -> int:
             "audio_output_type": config.get("audio_output_type", "mock"),
         }
     )
-    audio_output = build_audio_output(config, event_callback=print)
+    audio_output = build_audio_output(config, event_callback=print, repo_root=REPO_ROOT)
 
     orchestrator = TourOrchestrator(
         route_pois=route_pois,

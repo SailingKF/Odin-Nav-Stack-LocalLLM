@@ -2,6 +2,8 @@ env_name: edge
 pose_provider_type: odin_ros
 narrator_type: local_llm
 audio_output_type: mock
+tts_backend_type: mock
+tts_artifact_dir: session_logs/edge_tts_artifacts
 narration_mode_default: standard
 llm_gateway_url: http://127.0.0.1:9000
 llm_backend_type: ollama

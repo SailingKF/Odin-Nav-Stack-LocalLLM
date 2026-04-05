@@ -27,6 +27,8 @@ class ApiServerTests(unittest.TestCase):
             "pose_provider_type": "mock",
             "narrator_type": "mock",
             "audio_output_type": "mock",
+            "tts_backend_type": "mock",
+            "tts_artifact_dir": str(Path(self._temp_dir.name) / "tts_artifacts" / "mock"),
             "narration_mode_default": "standard",
             "llm_gateway_url": "http://127.0.0.1:9000",
             "llm_backend_type": "mock",
@@ -120,6 +122,8 @@ class ApiServerTests(unittest.TestCase):
             "pose_provider_type": "mock",
             "narrator_type": "local_llm",
             "audio_output_type": "mock",
+            "tts_backend_type": "mock",
+            "tts_artifact_dir": str(Path(self._temp_dir.name) / "tts_artifacts" / "local_llm"),
             "narration_mode_default": "standard",
             "llm_gateway_url": "http://127.0.0.1:65500",
             "llm_backend_type": "ollama",
@@ -145,6 +149,44 @@ class ApiServerTests(unittest.TestCase):
             self.assertTrue(payload["ok"])
             self.assertIn("answer_text", payload)
             self.assertIn("first stop", payload["answer_text"])
+        finally:
+            self._wait_until_runtime_stops(runtime)
+
+    def test_service_backed_audio_output_exposes_tts_metadata(self) -> None:
+        session_dir = Path(self._temp_dir.name) / "session_logs" / "dev_api_tts_service_test"
+        artifact_dir = Path(self._temp_dir.name) / "tts_artifacts" / "service_api"
+        config = {
+            "env_name": "dev",
+            "pose_provider_type": "mock",
+            "narrator_type": "mock",
+            "audio_output_type": "tts_service",
+            "tts_backend_type": "mock",
+            "tts_artifact_dir": str(artifact_dir),
+            "narration_mode_default": "standard",
+            "llm_gateway_url": "http://127.0.0.1:9000",
+            "llm_backend_type": "mock",
+            "llm_model_name": "mock-curated-content",
+            "llm_base_url": "http://127.0.0.1:11434",
+            "llm_timeout_sec": 8.0,
+            "llm_enable_fallback": True,
+            "session_log_dir": str(session_dir),
+            "recording_enabled": False,
+            "current_route_file": "content/routes/demo_route.yaml",
+            "current_poi_file": "content/poi/demo_pois.yaml",
+        }
+        runtime = MockTourApiRuntime(config=config, repo_root=REPO_ROOT, step_interval_seconds=0.02)
+        client = TestClient(create_app(runtime=runtime))
+
+        try:
+            client.post("/tour/start")
+            time.sleep(0.25)
+            client.post("/tour/question", json={"question": "Why does the tour start here?"})
+            payload = client.get("/session/latest").json()
+
+            self.assertEqual(payload["latest_audio_playback"]["extra"]["output_type"], "tts_service")
+            self.assertEqual(payload["latest_audio_playback"]["extra"]["metadata"]["backend_type"], "mock")
+            artifact_uri = payload["latest_audio_playback"]["extra"]["metadata"]["artifact"]["artifact_uri"]
+            self.assertTrue(Path(artifact_uri).exists())
         finally:
             self._wait_until_runtime_stops(runtime)
 

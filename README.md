@@ -343,12 +343,15 @@ What is included:
 
 Config knob:
 ```yaml
-audio_output_type: mock
+audio_output_type: tts_service
+tts_backend_type: mock
+tts_artifact_dir: session_logs/dev_tts_artifacts
 ```
 
 Current development modes:
 - `mock`: records playback requests and prints lightweight `[AUDIO]` traces
 - `silent`: keeps the flow intact but marks playback as skipped
+- `tts_service`: routes playback through the service-layer TTS contract and returns synthesis artifact metadata
 
 How to validate quickly:
 ```shell
@@ -364,12 +367,43 @@ What you should see during a run:
 
 Focused contract doc:
 - `docs/AUDIO_OUTPUT_CONTRACT.md`
+- `docs/TTS_SERVICE_CONTRACT.md`
 
 What still remains before real spoken playback:
 - choosing a TTS backend
 - queueing / interrupt behavior
 - audio device selection
 - waveform or stream generation
+
+## TTS Service Baseline
+
+This iteration adds a service-layer synthesis contract under `services/tts_service/` so the audio path can be structured like a real TTS pipeline without committing to an engine yet.
+
+What is included:
+- `services/tts_service/service.py` with request/response/artifact types
+- a deterministic `MockTTSBackend`
+- a service-backed audio output mode that calls the TTS service
+- artifact-aware playback metadata in runtime state and session summaries
+
+Current service-backed behavior:
+- synthesis writes a lightweight JSON artifact instead of an audio waveform
+- playback metadata reports:
+  - active backend type
+  - synthesis status
+  - estimated duration
+  - artifact URI, kind, mime type, and content hash
+
+How to validate the service-backed path:
+```shell
+python scripts/run_mock_tour.py
+python -m unittest tests.test_tts_service -v
+```
+
+What you should see:
+- `[AUDIO] narration via tts_service/mock: ...`
+- `[AUDIO] answer via tts_service/mock: ...`
+- `latest_audio_playback.extra.metadata.backend_type == "mock"`
+- a generated mock synthesis artifact under the configured `tts_artifact_dir`
 
 # Quick Start
 

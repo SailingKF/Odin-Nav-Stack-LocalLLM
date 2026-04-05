@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 
 @dataclass(frozen=True)
@@ -10,7 +10,7 @@ class AudioPlaybackRequest:
     spot_id: Optional[str] = None
     spot_name: Optional[str] = None
     session_id: Optional[str] = None
-    metadata: Dict[str, str] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -22,7 +22,7 @@ class AudioPlaybackResult:
     spot_id: Optional[str] = None
     spot_name: Optional[str] = None
     session_id: Optional[str] = None
-    metadata: Dict[str, str] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 class AudioOutput(ABC):

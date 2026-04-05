@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from adapters.mock.audio_output import MockAudioOutput, SilentAudioOutput
+from adapters.mock.audio_output import MockAudioOutput, ServiceBackedTTSAudioOutput, SilentAudioOutput, build_audio_output
 from core.interfaces.audio_output import AudioPlaybackRequest
 from core.interfaces.pose_provider import Pose2D
 from core.narrator.mock_narrator import MockNarrator
@@ -40,6 +40,33 @@ class AudioOutputTests(unittest.TestCase):
         self.assertEqual(result.status, "skipped")
         self.assertEqual(result.output_type, "silent")
 
+    def test_service_backed_audio_output_returns_synthesis_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = build_audio_output(
+                {
+                    "audio_output_type": "tts_service",
+                    "tts_backend_type": "mock",
+                    "tts_artifact_dir": temp_dir,
+                },
+                repo_root=Path.cwd(),
+            )
+
+            self.assertIsInstance(output, ServiceBackedTTSAudioOutput)
+            result = output.play_text(
+                request=AudioPlaybackRequest(
+                    text="hello",
+                    playback_kind="narration",
+                    session_id="session-3",
+                    spot_id="gate",
+                    spot_name="East Gate",
+                )
+            )
+
+            self.assertEqual(result.output_type, "tts_service")
+            self.assertEqual(result.metadata["backend_type"], "mock")
+            self.assertEqual(result.metadata["status"], "synthesized")
+            self.assertTrue(Path(result.metadata["artifact"]["artifact_uri"]).exists())
+
     def test_orchestrator_routes_narration_and_answer_through_audio_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             pois = load_pois("content/poi/demo_pois.yaml")
@@ -66,6 +93,45 @@ class AudioOutputTests(unittest.TestCase):
         self.assertEqual(audio_output.history[1].playback_kind, "answer")
         self.assertEqual(session_summary["latest_audio_playback"]["extra"]["playback_kind"], "answer")
         self.assertIn("East Gate", session_summary["latest_narration_text"])
+
+    def test_orchestrator_can_use_service_backed_audio_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            pois = load_pois("content/poi/demo_pois.yaml")
+            route = load_route("content/routes/demo_route.yaml")
+            route_pois = InMemoryPoiStore(pois).route_pois(route)
+            session_store = JsonlSessionStore(str(Path(temp_dir) / "session_logs"))
+            session_store.start_session({"env_name": "test"})
+            audio_output = build_audio_output(
+                {
+                    "audio_output_type": "tts_service",
+                    "tts_backend_type": "mock",
+                    "tts_artifact_dir": str(Path(temp_dir) / "tts_artifacts"),
+                },
+                repo_root=Path.cwd(),
+            )
+            orchestrator = TourOrchestrator(
+                route_pois=route_pois,
+                narrator=MockNarrator(),
+                session_store=session_store,
+                audio_output=audio_output,
+                narration_mode_default="standard",
+            )
+
+            orchestrator.handle_pose(Pose2D(x=0.0, y=0.0, label="gate_inside"))
+            answer = orchestrator.answer_question("Why does the tour start here?")
+            state = orchestrator.get_state()
+            session_summary = session_store.get_latest_session_summary()
+            artifact_path = Path(session_summary["latest_audio_playback"]["extra"]["metadata"]["artifact"]["artifact_uri"])
+
+            self.assertTrue(artifact_path.exists())
+
+        self.assertIn("first stop", answer["answer_text"])
+        self.assertEqual(state["audio_output_type"], "tts_service")
+        self.assertEqual(session_summary["latest_audio_playback"]["extra"]["output_type"], "tts_service")
+        self.assertEqual(
+            session_summary["latest_audio_playback"]["extra"]["metadata"]["backend_type"],
+            "mock",
+        )
 
 
 if __name__ == "__main__":
