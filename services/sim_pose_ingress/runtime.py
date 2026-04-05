@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
+from adapters.mock.audio_output import build_audio_output
 from adapters.sim.external_pose_provider import ExternalPoseProvider
 from core.interfaces.pose_provider import Pose2D
 from core.narrator.factory import build_narrator
@@ -48,12 +49,14 @@ class SimPoseIngressRuntime:
         pose_provider = ExternalPoseProvider()
         session_store = JsonlSessionStore(str(self._session_log_dir))
         narrator = build_narrator(self._config)
+        audio_output = build_audio_output(self._config, event_callback=print)
 
         self._pose_provider = pose_provider
         return TourOrchestrator(
             route_pois=route_pois,
             narrator=narrator,
             session_store=session_store,
+            audio_output=audio_output,
             pose_provider=pose_provider,
             session_metadata={
                 "env_name": self._config["env_name"],
@@ -62,6 +65,7 @@ class SimPoseIngressRuntime:
                 "recording_enabled": bool(self._config["recording_enabled"]),
                 "control_mode": "sim_pose_ingress",
                 "narrator_type": self._config.get("narrator_type", "mock"),
+                "audio_output_type": self._config.get("audio_output_type", "mock"),
             },
             event_callback=print,
             narration_mode_default=str(self._config.get("narration_mode_default", "standard")),
@@ -75,6 +79,7 @@ class SimPoseIngressRuntime:
             "env_name": self._config["env_name"],
             "pose_provider_type": self._config["pose_provider_type"],
             "narrator_type": self._config.get("narrator_type", "mock"),
+            "audio_output_type": self._config.get("audio_output_type", "mock"),
             "ingress_contract": {"required_fields": ["x", "y"], "optional_fields": ["label"]},
         }
 
@@ -96,6 +101,8 @@ class SimPoseIngressRuntime:
                 "last_event_type": None,
                 "last_narration_text": None,
                 "last_answer_text": None,
+                "audio_output_type": self._config.get("audio_output_type", "mock"),
+                "last_audio_playback": None,
                 "session_log_path": None,
             }
         return self._orchestrator.get_state()

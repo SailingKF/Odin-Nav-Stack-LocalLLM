@@ -26,6 +26,7 @@ class ApiServerTests(unittest.TestCase):
             "env_name": "dev",
             "pose_provider_type": "mock",
             "narrator_type": "mock",
+            "audio_output_type": "mock",
             "narration_mode_default": "standard",
             "llm_gateway_url": "http://127.0.0.1:9000",
             "llm_backend_type": "mock",
@@ -56,6 +57,8 @@ class ApiServerTests(unittest.TestCase):
         self.assertIn("state", payload)
         self.assertIn("is_running", payload)
         self.assertIn("session_log_path", payload)
+        self.assertIn("audio_output_type", payload)
+        self.assertIn("last_audio_playback", payload)
 
     def test_debug_page_is_served_for_mobile_use(self) -> None:
         response = self.client.get("/debug")
@@ -96,6 +99,7 @@ class ApiServerTests(unittest.TestCase):
         self.assertGreater(session_payload["event_count"], 0)
         self.assertIn("latest_state", session_payload)
         self.assertIn("latest_narration_text", session_payload)
+        self.assertIn("latest_audio_playback", session_payload)
 
     def test_question_endpoint_returns_answer(self) -> None:
         self.client.post("/tour/start")
@@ -115,6 +119,7 @@ class ApiServerTests(unittest.TestCase):
             "env_name": "dev",
             "pose_provider_type": "mock",
             "narrator_type": "local_llm",
+            "audio_output_type": "mock",
             "narration_mode_default": "standard",
             "llm_gateway_url": "http://127.0.0.1:65500",
             "llm_backend_type": "ollama",

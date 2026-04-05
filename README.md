@@ -331,6 +331,46 @@ Ollama / Gemma note:
 - set `llm_model_name` to the model tag that exists in your local runtime
 - if Ollama is not installed or the model is missing, `/health` will report a degraded state and fallback can keep the route alive
 
+## Audio Output Boundary
+
+This iteration introduces a platform-agnostic audio output contract so narration and follow-up answers can flow through an explicit playback path before we choose a real TTS engine.
+
+What is included:
+- core audio interface in `core/interfaces/audio_output.py`
+- development adapters in `adapters/mock/audio_output.py`
+- orchestrator wiring so narration and answer text both request playback
+- session and state fields that expose playback activity
+
+Config knob:
+```yaml
+audio_output_type: mock
+```
+
+Current development modes:
+- `mock`: records playback requests and prints lightweight `[AUDIO]` traces
+- `silent`: keeps the flow intact but marks playback as skipped
+
+How to validate quickly:
+```shell
+python scripts/run_mock_tour.py
+python -m unittest tests.test_audio_output -v
+```
+
+What you should see during a run:
+- normal narration text output
+- `[AUDIO] narration via mock: ...`
+- `[AUDIO] answer via mock: ...`
+- session state containing `last_audio_playback`
+
+Focused contract doc:
+- `docs/AUDIO_OUTPUT_CONTRACT.md`
+
+What still remains before real spoken playback:
+- choosing a TTS backend
+- queueing / interrupt behavior
+- audio device selection
+- waveform or stream generation
+
 # Quick Start
 
 The code has been tested on:

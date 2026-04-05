@@ -1,6 +1,7 @@
 env_name: dev
 pose_provider_type: mock
 narrator_type: local_llm
+audio_output_type: mock
 narration_mode_default: standard
 llm_gateway_url: http://127.0.0.1:9000
 llm_backend_type: ollama

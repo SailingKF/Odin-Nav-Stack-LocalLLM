@@ -2,6 +2,7 @@ import threading
 import time
 from typing import Any, Callable, Dict, List, Optional
 
+from core.interfaces.audio_output import AudioOutput, AudioPlaybackRequest, AudioPlaybackResult
 from core.interfaces.narrator import Narrator
 from core.interfaces.pose_provider import Pose2D, PoseProvider
 from core.interfaces.session_store import SessionStore
@@ -16,6 +17,7 @@ class TourOrchestrator:
         route_pois: List[POI],
         narrator: Narrator,
         session_store: SessionStore,
+        audio_output: Optional[AudioOutput] = None,
         trigger_engine: Optional[PoiTriggerEngine] = None,
         event_callback: Optional[Callable[[str], None]] = None,
         pose_provider: Optional[PoseProvider] = None,
@@ -26,6 +28,7 @@ class TourOrchestrator:
         self._route_pois = route_pois
         self._narrator = narrator
         self._session_store = session_store
+        self._audio_output = audio_output
         self._trigger_engine = trigger_engine or PoiTriggerEngine()
         self._event_callback = event_callback
         self._pose_provider = pose_provider
@@ -45,6 +48,7 @@ class TourOrchestrator:
         self._last_answer_text: Optional[str] = None
         self._last_event_type: Optional[str] = None
         self._last_focus_poi: Optional[POI] = None
+        self._last_audio_playback: Optional[Dict[str, Any]] = None
 
     @property
     def state(self) -> TourState:
@@ -81,6 +85,16 @@ class TourOrchestrator:
             self._last_narration_text = narration_text
         if event_type == "question_answered" and narration_text is not None:
             self._last_answer_text = narration_text
+        if event_type == "audio_playback_requested":
+            self._last_audio_playback = {
+                "event_type": event_type,
+                "state": state,
+                "pose": None if pose is None else {"x": pose.x, "y": pose.y, "label": pose.label},
+                "spot_id": None if poi is None else poi.spot_id,
+                "spot_name": None if poi is None else poi.name,
+                "text": narration_text,
+                "extra": extra or {},
+            }
 
     def _transition(self, next_state: TourState, pose: Optional[Pose2D], poi: Optional[POI]) -> None:
         previous_state = self._state
@@ -101,6 +115,45 @@ class TourOrchestrator:
             return
         self._session_store.start_session(self._session_metadata)
         self._session_started_by_orchestrator = True
+
+    def _request_audio_playback(
+        self,
+        text: str,
+        playback_kind: str,
+        pose: Optional[Pose2D],
+        poi: Optional[POI],
+        metadata: Optional[Dict[str, str]] = None,
+    ) -> Optional[AudioPlaybackResult]:
+        if self._audio_output is None:
+            return None
+
+        session_id = getattr(self._session_store, "session_id", None)
+        result = self._audio_output.play_text(
+            AudioPlaybackRequest(
+                text=text,
+                playback_kind=playback_kind,
+                spot_id=None if poi is None else poi.spot_id,
+                spot_name=None if poi is None else poi.name,
+                session_id=session_id,
+                metadata=metadata or {},
+            )
+        )
+        result_payload = {
+            "output_type": result.output_type,
+            "playback_kind": result.playback_kind,
+            "status": result.status,
+            "session_id": result.session_id,
+            "metadata": dict(result.metadata),
+        }
+        self._append_event(
+            event_type="audio_playback_requested",
+            pose=pose,
+            poi=poi,
+            state=self._state.value,
+            narration_text=text,
+            extra=result_payload,
+        )
+        return result
 
     def _complete_route(self, pose: Optional[Pose2D]) -> None:
         if self._completed:
@@ -145,6 +198,7 @@ class TourOrchestrator:
             self._last_answer_text = None
             self._last_event_type = "tour_started"
             self._last_focus_poi = None
+            self._last_audio_playback = None
             self._current_index = 0
             self._trigger_engine.reset()
             self._state = TourState.IDLE
@@ -235,6 +289,13 @@ class TourOrchestrator:
                 narration_text=answer_text,
                 extra={"question": question},
             )
+            self._request_audio_playback(
+                text=answer_text,
+                playback_kind="answer",
+                pose=self._last_pose,
+                poi=focus_poi,
+                metadata={"question": question},
+            )
             self._emit(f"[ANSWER] {focus_poi.name}: {answer_text}")
             return {
                 "question": question,
@@ -269,6 +330,8 @@ class TourOrchestrator:
             "last_event_type": self._last_event_type,
             "last_narration_text": self._last_narration_text,
             "last_answer_text": self._last_answer_text,
+            "audio_output_type": None if self._audio_output is None else getattr(self._audio_output, "output_type", type(self._audio_output).__name__),
+            "last_audio_playback": self._last_audio_playback,
             "session_log_path": None if output_path is None else str(output_path),
         }
 
@@ -288,6 +351,7 @@ class TourOrchestrator:
             "latest_spot_name": None if self._active_poi() is None else self._active_poi().name,
             "latest_narration_text": self._last_narration_text,
             "latest_answer_text": self._last_answer_text,
+            "latest_audio_playback": self._last_audio_playback,
         }
 
     def handle_pose(self, pose: Pose2D) -> None:
@@ -331,6 +395,13 @@ class TourOrchestrator:
                 state=self._state.value,
                 narration_text=narration_text,
                 extra={"mode": self._narration_mode_default},
+            )
+            self._request_audio_playback(
+                text=narration_text,
+                playback_kind="narration",
+                pose=pose,
+                poi=active_poi,
+                metadata={"mode": self._narration_mode_default},
             )
             self._emit(f"[NARRATION] {active_poi.name}: {narration_text}")
 

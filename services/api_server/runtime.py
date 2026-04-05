@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional
 
 import yaml
 
+from adapters.mock.audio_output import build_audio_output
 from adapters.mock.mock_pose_provider import MockPoseProvider
 from core.narrator.factory import build_narrator
 from core.poi.loader import load_pois, load_route
@@ -46,11 +47,13 @@ class MockTourApiRuntime:
         pose_provider = MockPoseProvider.from_route_pois(route_pois)
         session_store = JsonlSessionStore(str(self._session_log_dir))
         narrator = build_narrator(self._config)
+        audio_output = build_audio_output(self._config, event_callback=print)
 
         return TourOrchestrator(
             route_pois=route_pois,
             narrator=narrator,
             session_store=session_store,
+            audio_output=audio_output,
             pose_provider=pose_provider,
             session_metadata={
                 "env_name": self._config["env_name"],
@@ -59,6 +62,7 @@ class MockTourApiRuntime:
                 "recording_enabled": bool(self._config["recording_enabled"]),
                 "control_mode": "api",
                 "narrator_type": self._config.get("narrator_type", "mock"),
+                "audio_output_type": self._config.get("audio_output_type", "mock"),
             },
             event_callback=print,
             narration_mode_default=str(self._config.get("narration_mode_default", "standard")),
@@ -72,6 +76,7 @@ class MockTourApiRuntime:
             "env_name": self._config["env_name"],
             "pose_provider_type": self._config["pose_provider_type"],
             "narrator_type": self._config.get("narrator_type", "mock"),
+            "audio_output_type": self._config.get("audio_output_type", "mock"),
         }
 
     def state(self) -> Dict[str, Any]:
@@ -92,6 +97,8 @@ class MockTourApiRuntime:
                 "last_event_type": None,
                 "last_narration_text": None,
                 "last_answer_text": None,
+                "audio_output_type": self._config.get("audio_output_type", "mock"),
+                "last_audio_playback": None,
                 "session_log_path": None,
             }
         return self._orchestrator.get_state()

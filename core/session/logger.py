@@ -17,6 +17,7 @@ class JsonlSessionStore(SessionStore):
         self._latest_event: Optional[Dict[str, Any]] = None
         self._latest_narration_text: Optional[str] = None
         self._latest_answer_text: Optional[str] = None
+        self._latest_audio_playback: Optional[Dict[str, Any]] = None
         self._closed = True
 
     @property
@@ -38,6 +39,7 @@ class JsonlSessionStore(SessionStore):
         self._latest_event = None
         self._latest_narration_text = None
         self._latest_answer_text = None
+        self._latest_audio_playback = None
         self._closed = False
         self.append_event("session_started", state="IDLE", extra=metadata or {})
         return self._session_id
@@ -75,6 +77,16 @@ class JsonlSessionStore(SessionStore):
             self._latest_narration_text = narration_text
         if event_type == "question_answered" and narration_text:
             self._latest_answer_text = narration_text
+        if event_type == "audio_playback_requested":
+            self._latest_audio_playback = {
+                "event_type": event_type,
+                "state": payload.get("state"),
+                "pose": payload.get("pose"),
+                "spot_id": payload.get("spot_id"),
+                "spot_name": payload.get("spot_name"),
+                "text": payload.get("narration_text"),
+                "extra": payload.get("extra") or {},
+            }
 
     def close(self) -> None:
         if self._output_path is None or self._closed:
@@ -96,6 +108,7 @@ class JsonlSessionStore(SessionStore):
             "latest_spot_name": latest.get("spot_name"),
             "latest_narration_text": self._latest_narration_text,
             "latest_answer_text": self._latest_answer_text,
+            "latest_audio_playback": self._latest_audio_playback,
         }
 
     def get_latest_session_summary(self) -> Dict[str, Any]:
@@ -130,6 +143,7 @@ class JsonlSessionStore(SessionStore):
                 "latest_spot_name": None,
                 "latest_narration_text": None,
                 "latest_answer_text": None,
+                "latest_audio_playback": None,
             }
 
         latest_path = files[-1]
@@ -154,4 +168,20 @@ class JsonlSessionStore(SessionStore):
             "latest_spot_name": latest.get("spot_name"),
             "latest_narration_text": latest_narration,
             "latest_answer_text": latest_answer,
+            "latest_audio_playback": next(
+                (
+                    {
+                        "event_type": item.get("event_type"),
+                        "state": item.get("state"),
+                        "pose": item.get("pose"),
+                        "spot_id": item.get("spot_id"),
+                        "spot_name": item.get("spot_name"),
+                        "text": item.get("narration_text"),
+                        "extra": item.get("extra") or {},
+                    }
+                    for item in reversed(events)
+                    if item.get("event_type") == "audio_playback_requested"
+                ),
+                None,
+            ),
         }

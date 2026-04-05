@@ -7,6 +7,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from adapters.mock.audio_output import build_audio_output
 from adapters.mock.mock_pose_provider import MockPoseProvider
 from core.narrator.factory import build_narrator
 from core.poi.loader import load_pois, load_route
@@ -44,13 +45,16 @@ def main() -> int:
             "route_id": route.route_id,
             "recording_enabled": bool(config["recording_enabled"]),
             "narrator_type": config.get("narrator_type", "mock"),
+            "audio_output_type": config.get("audio_output_type", "mock"),
         }
     )
+    audio_output = build_audio_output(config, event_callback=print)
 
     orchestrator = TourOrchestrator(
         route_pois=route_pois,
         narrator=narrator,
         session_store=session_store,
+        audio_output=audio_output,
         event_callback=print,
         narration_mode_default=str(config.get("narration_mode_default", "standard")),
     )
@@ -59,12 +63,15 @@ def main() -> int:
 
     print(
         f"[CONFIG] env={config['env_name']} pose_provider={config['pose_provider_type']} "
-        f"narrator={config.get('narrator_type', 'mock')} route={route.route_id}"
+        f"narrator={config.get('narrator_type', 'mock')} audio_output={config.get('audio_output_type', 'mock')} "
+        f"route={route.route_id}"
     )
     for pose in provider.iter_poses():
         print(f"[POSE] x={pose.x:.2f} y={pose.y:.2f}")
         orchestrator.handle_pose(pose)
 
+    answer = orchestrator.answer_question("Why does the tour start here?")
+    print(f"[FOLLOWUP] {answer['answer_text']}")
     session_store.close()
     print(f"[SESSION] log saved to {session_store.output_path}")
     return 0
