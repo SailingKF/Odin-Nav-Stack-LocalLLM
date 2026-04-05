@@ -14,6 +14,7 @@ from core.session.logger import (
     build_audio_summary_from_latest_audio_playback,
 )
 from core.tour_orchestrator.orchestrator import TourOrchestrator
+from services.deployment_profile import build_deployment_profile
 
 
 def _build_audio_summary(
@@ -65,6 +66,7 @@ class MockTourApiRuntime:
         self._step_interval_seconds = step_interval_seconds
         self._orchestrator: Optional[TourOrchestrator] = None
         self._session_log_dir = repo_root / config["session_log_dir"]
+        self._deployment_profile = build_deployment_profile(config)
 
     @classmethod
     def from_config_path(
@@ -123,6 +125,7 @@ class MockTourApiRuntime:
             "pose_provider_type": self._config["pose_provider_type"],
             "narrator_type": self._config.get("narrator_type", "mock"),
             "audio_output_type": self._config.get("audio_output_type", "mock"),
+            "deployment_profile": self._deployment_profile,
         }
 
     def state(self) -> Dict[str, Any]:
@@ -148,12 +151,14 @@ class MockTourApiRuntime:
                 "last_audio_playback": None,
                 "audio_summary": _build_audio_summary(None, None),
                 "session_log_path": None,
+                "deployment_profile": self._deployment_profile,
             }
         state = self._orchestrator.get_state()
         state["audio_summary"] = _build_audio_summary(
             playback_state=state.get("audio_playback_state"),
             latest_audio_playback=state.get("last_audio_playback"),
         )
+        state["deployment_profile"] = self._deployment_profile
         return state
 
     def start_tour(self) -> Dict[str, Any]:

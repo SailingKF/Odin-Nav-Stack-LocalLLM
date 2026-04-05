@@ -496,6 +496,49 @@ Focused contract docs:
 - `docs/ARTIFACT_PLAYER_BACKEND.md`
 - `docs/AUDIO_PLAYBACK_POLICY.md`
 
+## Deployment Capability Profiles
+
+This iteration adds a narrow deployment capability/profile layer so the repo can state what `dev`, `sim`, and `edge` currently mean without scattering environment checks across the codebase.
+
+What is included:
+- a profile/validation seam in `services/deployment_profile/profile.py`
+- API-visible `deployment_profile` summaries in runtime health/state surfaces
+- focused validation for obvious profile mismatches and placeholder/mock settings
+
+Current profile intent:
+- `dev`: laptop-first, mock pose, fast iteration, API/debug validation
+- `sim`: simulator ingress path, sim-first integration, optional stub/live Isaac source
+- `edge`: Orin/robot-oriented shape, local LLM expected, real pose/audio still allowed to be placeholder for now
+
+What the profile summary now reports:
+- deployment class such as `dev_only`, `sim_only`, or `edge_candidate`
+- readiness state such as `ready_for_profile`, `placeholder`, or `invalid`
+- expected pose / LLM / audio / recording shape
+- active mock-only components
+- placeholder components that still block true edge readiness
+- validation warnings and errors for obvious mismatches
+
+Current edge placeholders in this repo:
+- `audio_output_type: mock`
+- `tts_backend_type: mock`
+- `artifact_player_backend_type: mock`
+
+How to inspect it:
+```shell
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/state
+```
+
+Look for:
+- `deployment_profile.profile_name`
+- `deployment_profile.readiness_status`
+- `deployment_profile.mock_components_active`
+- `deployment_profile.placeholder_components`
+
+Focused contract doc:
+- `docs/DEPLOYMENT_PROFILE_CONTRACT.md`
+- `docs/DEPLOYMENT.md`
+
 How to validate the service-backed path:
 ```shell
 python scripts/run_mock_tour.py

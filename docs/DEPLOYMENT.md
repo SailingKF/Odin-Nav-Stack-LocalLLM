@@ -138,6 +138,7 @@ Suggested files:
 - `configs/dev.yaml`
 - `configs/sim.yaml`
 - `configs/edge.yaml`
+- `services/deployment_profile/profile.py`
 
 These should control:
 - pose provider implementation
@@ -150,6 +151,17 @@ These should control:
 - video configuration
 
 Do not fork behavior through scattered hardcoded checks.
+
+Current runtime-facing profile summary now exposes:
+- deployment class
+- readiness status
+- expected pose/audio/LLM characteristics
+- active mock-only components
+- placeholder components that still block true edge readiness
+- validation warnings/errors for obvious mismatches
+
+See also:
+- `docs/DEPLOYMENT_PROFILE_CONTRACT.md`
 
 ---
 
@@ -254,12 +266,16 @@ For edge:
 - mock pose triggers POIs
 - UI reachable
 - session logs written
+- deployment profile reports `deployment_class: dev_only`
+- deployment profile reports `readiness_status: ready_for_profile`
 
 ### Sim
 - sim pose reaches app
 - route/POI trigger works
 - logs remain coherent
 - Android-accessible UI works over network
+- deployment profile reports `deployment_class: sim_only`
+- deployment profile reports live vs stub simulator status clearly
 
 ### Edge
 - services boot reliably
@@ -267,6 +283,8 @@ For edge:
 - UI reachable from Android
 - reduced resource mode works
 - core tour loop works even if non-essential services are disabled
+- deployment profile reports whether the current config is still placeholder/mock
+- obvious pose/audio/LLM mismatches appear as validation warnings or errors
 
 ---
 
