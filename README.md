@@ -876,6 +876,33 @@ Focused contract doc:
 - `docs/DEPLOYMENT_ENDPOINT_CONTRACT.md`
 - `docs/DEPLOYMENT_ENDPOINT_CONFIG_CANONICALIZATION.md`
 
+## Deployment Config Hygiene Summary
+
+This iteration adds a narrow endpoint config-hygiene layer on top of the canonical endpoint contract so operators can see migration/deprecation status without reading code.
+
+Current runtime-visible surface:
+- `deployment_config_hygiene`
+
+What it now makes explicit:
+- whether a profile is `fully_canonicalized`, `partially_canonicalized`, `mixed_canonical_and_legacy`, `legacy_dependent`, or `default_heavy`
+- whether deprecated fields such as `llm_gateway_url` are merely present or still actively in use
+- what migration action is recommended next for each repo-owned service
+
+How to inspect it now:
+```shell
+python scripts/print_config_hygiene.py --config configs/dev.yaml
+python scripts/print_config_hygiene.py --config configs/sim.yaml
+python scripts/print_config_hygiene.py --config configs/edge.yaml
+```
+
+Migration intent in this round:
+- keep backward compatibility
+- prefer `service_endpoints.<service_id>` as the canonical config shape
+- surface legacy/deprecation cleanup as guidance, not as a breaking change
+
+Focused contract doc:
+- `docs/DEPLOYMENT_CONFIG_HYGIENE.md`
+
 How to validate the service-backed path:
 ```shell
 python scripts/run_mock_tour.py

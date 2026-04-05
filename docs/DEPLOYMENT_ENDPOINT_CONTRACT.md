@@ -157,3 +157,4 @@ It only centralizes:
 For the focused canonicalization rules and precedence story, see:
 
 - `docs/DEPLOYMENT_ENDPOINT_CONFIG_CANONICALIZATION.md`
+- `docs/DEPLOYMENT_CONFIG_HYGIENE.md`

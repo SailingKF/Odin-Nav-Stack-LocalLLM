@@ -16,6 +16,7 @@ from core.session.logger import (
 from core.tour_orchestrator.orchestrator import TourOrchestrator
 from services.deployment_profile import (
     build_deployment_command_manifest,
+    build_deployment_config_hygiene,
     build_deployment_endpoint_contract,
     build_deployment_launch_plan,
     build_deployment_preflight,
@@ -80,6 +81,10 @@ class MockTourApiRuntime:
         self._deployment_endpoint_contract = build_deployment_endpoint_contract(
             config,
             self._deployment_launch_plan,
+        )
+        self._deployment_config_hygiene = build_deployment_config_hygiene(
+            config,
+            self._deployment_endpoint_contract,
         )
         self._deployment_readiness = build_deployment_readiness(
             self._deployment_profile,
@@ -157,6 +162,7 @@ class MockTourApiRuntime:
             "deployment_preflight": self._deployment_preflight,
             "deployment_launch_plan": self._deployment_launch_plan,
             "deployment_endpoint_contract": self._deployment_endpoint_contract,
+            "deployment_config_hygiene": self._deployment_config_hygiene,
             "deployment_readiness": self._deployment_readiness,
             "deployment_command_manifest": self._deployment_command_manifest,
             "deployment_verification_manifest": self._deployment_verification_manifest,
@@ -189,6 +195,7 @@ class MockTourApiRuntime:
                 "deployment_preflight": self._deployment_preflight,
                 "deployment_launch_plan": self._deployment_launch_plan,
                 "deployment_endpoint_contract": self._deployment_endpoint_contract,
+                "deployment_config_hygiene": self._deployment_config_hygiene,
                 "deployment_readiness": self._deployment_readiness,
                 "deployment_command_manifest": self._deployment_command_manifest,
                 "deployment_verification_manifest": self._deployment_verification_manifest,
@@ -202,6 +209,7 @@ class MockTourApiRuntime:
         state["deployment_preflight"] = self._deployment_preflight
         state["deployment_launch_plan"] = self._deployment_launch_plan
         state["deployment_endpoint_contract"] = self._deployment_endpoint_contract
+        state["deployment_config_hygiene"] = self._deployment_config_hygiene
         state["deployment_readiness"] = self._deployment_readiness
         state["deployment_command_manifest"] = self._deployment_command_manifest
         state["deployment_verification_manifest"] = self._deployment_verification_manifest

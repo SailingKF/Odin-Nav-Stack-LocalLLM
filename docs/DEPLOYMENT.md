@@ -173,6 +173,7 @@ See also:
 - `docs/DEPLOYMENT_VERIFICATION_RUNNER_CONTRACT.md`
 - `docs/DEPLOYMENT_ENDPOINT_CONTRACT.md`
 - `docs/DEPLOYMENT_ENDPOINT_CONFIG_CANONICALIZATION.md`
+- `docs/DEPLOYMENT_CONFIG_HYGIENE.md`
 
 ---
 
@@ -300,6 +301,21 @@ Current repo-owned endpoint assumptions are now also available through:
 - `python scripts/print_endpoint_contract.py --config configs/<profile>.yaml`
 
 This endpoint-contract layer is where repo-owned bind host, connect host, port, and base URL assumptions become explicit and reusable.
+
+Current endpoint config hygiene and deprecation guidance are now also available through:
+
+- API `deployment_config_hygiene`
+- `python scripts/print_config_hygiene.py --config configs/<profile>.yaml`
+
+This hygiene-summary layer is where operators can see whether a profile is:
+
+- fully canonicalized
+- partially canonicalized
+- mixed between canonical and legacy config
+- legacy-dependent
+- default-heavy
+
+It also makes deprecated compatibility-field presence versus active usage explicit, so cleanup can happen deliberately instead of by guesswork.
 
 Current preferred endpoint config shape is now:
 

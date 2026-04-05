@@ -4,6 +4,7 @@ from services.deployment_profile.launch_plan import build_deployment_launch_plan
 from services.deployment_profile.readiness import build_deployment_readiness
 from services.deployment_profile.endpoint_config import build_canonical_endpoint_config
 from services.deployment_profile.endpoint_contract import build_deployment_endpoint_contract
+from services.deployment_profile.config_hygiene import build_deployment_config_hygiene
 from services.deployment_profile.command_manifest import (
     build_deployment_command_manifest,
     build_guided_bringup_sheet,
@@ -24,6 +25,7 @@ __all__ = [
     "build_deployment_readiness",
     "build_canonical_endpoint_config",
     "build_deployment_endpoint_contract",
+    "build_deployment_config_hygiene",
     "build_deployment_command_manifest",
     "build_guided_bringup_sheet",
     "build_deployment_verification_manifest",
