@@ -104,6 +104,11 @@ Current semantics:
 - 2D map-frame coordinates
 - `label` is only for debugging
 
+If a simulator publishes raw frame coordinates instead of normalized map-frame coordinates:
+- normalize them on the publisher side first
+- then send the resulting `x`, `y`, and optional `label` to this HTTP bridge
+- see `docs/SIM_FRAME_TRANSFORM_CONTRACT.md`
+
 ## Demo Usage
 
 Start the bridge:
@@ -116,6 +121,12 @@ Post the demo stream:
 
 ```shell
 python scripts/post_sim_pose_stream.py
+```
+
+Post a raw simulator-style stream through the publisher transform layer:
+
+```shell
+python scripts/post_sim_raw_pose_stream.py
 ```
 
 ## What Still Remains Before Real Isaac Sim Integration

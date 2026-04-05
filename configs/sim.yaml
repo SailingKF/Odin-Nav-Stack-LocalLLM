@@ -12,3 +12,12 @@ session_log_dir: session_logs/sim
 recording_enabled: false
 current_route_file: content/routes/demo_route.yaml
 current_poi_file: content/poi/demo_pois.yaml
+publisher_frame_transform:
+  raw_x_field: sim_x
+  raw_y_field: sim_y
+  swap_axes: true
+  flip_x: true
+  flip_y: true
+  scale: 1.0
+  offset_x: 0.0
+  offset_y: 0.0

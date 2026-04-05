@@ -25,6 +25,10 @@ HTTP bridge:
 - `services/sim_pose_ingress/app.py`
 - `docs/SIM_POSE_HTTP_BRIDGE.md`
 
+Publisher-side frame transform:
+- `adapters/sim/frame_transform.py`
+- `docs/SIM_FRAME_TRANSFORM_CONTRACT.md`
+
 ## Payload Contract
 
 Each externally supplied pose payload uses this shape:

@@ -1,0 +1,19 @@
+poses:
+  - sim_x: 0.7
+    sim_y: 1.8
+    label: gate_approach_raw
+  - sim_x: 0.0
+    sim_y: 0.6
+    label: gate_trigger_edge_raw
+  - sim_x: 0.0
+    sim_y: 0.0
+    label: gate_inside_raw
+  - sim_x: -0.1
+    sim_y: -1.3
+    label: gate_depart_raw
+  - sim_x: -0.8
+    sim_y: -3.9
+    label: plaza_trigger_edge_raw
+  - sim_x: -1.0
+    sim_y: -5.0
+    label: plaza_inside_raw
