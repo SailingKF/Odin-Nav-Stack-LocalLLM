@@ -161,11 +161,13 @@ Current runtime-facing profile summary now exposes:
 - validation warnings/errors for obvious mismatches
 - preflight dependency checks and safe local probes
 - launch-plan startup order and readiness gates
+- aggregated deployment readiness and blocking summaries
 
 See also:
 - `docs/DEPLOYMENT_PROFILE_CONTRACT.md`
 - `docs/DEPLOYMENT_PREFLIGHT_CONTRACT.md`
 - `docs/DEPLOYMENT_LAUNCH_PLAN_CONTRACT.md`
+- `docs/DEPLOYMENT_READINESS_CONTRACT.md`
 
 ---
 
@@ -272,6 +274,13 @@ You can inspect it through:
 - `python scripts/print_launch_plan.py --config configs/<profile>.yaml`
 
 This round does not automate startup. It only makes current ordering, ownership, and gates explicit.
+
+Current operator-facing readiness rollup is now also available through:
+
+- API `deployment_readiness`
+- `python scripts/print_readiness_report.py --config configs/<profile>.yaml`
+
+This rollup is where `blocked` versus `external_unverified` becomes explicit.
 
 ### Current Startup Order Summary
 

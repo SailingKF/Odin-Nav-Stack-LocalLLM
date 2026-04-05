@@ -23,6 +23,10 @@ Current runtime-facing exposure:
 
 - `deployment_launch_plan`
 
+Related aggregation layer:
+
+- `deployment_readiness`
+
 ## Current Top-Level Surface
 
 The launch-plan summary exposes:
@@ -110,3 +114,7 @@ It only provides:
 - step ownership/categorization
 - readiness gates
 - a lightweight operator guidance surface
+
+For the operator-facing rollup built on top of this plan, see:
+
+- `docs/DEPLOYMENT_READINESS_CONTRACT.md`

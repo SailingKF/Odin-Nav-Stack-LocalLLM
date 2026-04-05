@@ -631,6 +631,53 @@ What this does not automate:
 Focused contract doc:
 - `docs/DEPLOYMENT_LAUNCH_PLAN_CONTRACT.md`
 
+## Deployment Readiness Report And Blocking Summary
+
+This iteration adds a narrow readiness aggregation layer that combines:
+- `deployment_profile`
+- `deployment_preflight`
+- `deployment_launch_plan`
+
+into one operator-facing readiness report.
+
+Current runtime-visible surface:
+- `deployment_readiness`
+
+Current per-step readiness states:
+- `ready`
+- `blocked`
+- `optional`
+- `external_unverified`
+- `not_applicable`
+
+Current overall readiness states:
+- `blocked`
+- `external_verification_needed`
+- `ready_for_guided_bringup`
+- `ready_with_placeholders`
+
+What this makes easier to see:
+- which required startup steps are currently ready
+- which required steps are blocked by missing or unreachable dependencies
+- which steps remain optional
+- which steps remain external and only partially verifiable
+
+How to inspect it now:
+```shell
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/state
+python scripts/print_readiness_report.py --config configs/dev.yaml
+python scripts/print_readiness_report.py --config configs/edge.yaml
+```
+
+What this still does not do:
+- auto-start services
+- supervise processes
+- prove real hardware pose or audio readiness
+
+Focused contract doc:
+- `docs/DEPLOYMENT_READINESS_CONTRACT.md`
+
 How to validate the service-backed path:
 ```shell
 python scripts/run_mock_tour.py

@@ -15,6 +15,7 @@ from services.deployment_profile import (
     build_deployment_launch_plan,
     build_deployment_preflight,
     build_deployment_profile,
+    build_deployment_readiness,
 )
 
 
@@ -34,6 +35,11 @@ class SimPoseIngressRuntime:
         self._deployment_profile = build_deployment_profile(config)
         self._deployment_preflight = build_deployment_preflight(config, repo_root)
         self._deployment_launch_plan = build_deployment_launch_plan(config)
+        self._deployment_readiness = build_deployment_readiness(
+            self._deployment_profile,
+            self._deployment_preflight,
+            self._deployment_launch_plan,
+        )
 
     @classmethod
     def from_config_path(
@@ -97,6 +103,7 @@ class SimPoseIngressRuntime:
             "deployment_profile": self._deployment_profile,
             "deployment_preflight": self._deployment_preflight,
             "deployment_launch_plan": self._deployment_launch_plan,
+            "deployment_readiness": self._deployment_readiness,
         }
 
     def state(self) -> Dict[str, Any]:
@@ -124,11 +131,13 @@ class SimPoseIngressRuntime:
                 "deployment_profile": self._deployment_profile,
                 "deployment_preflight": self._deployment_preflight,
                 "deployment_launch_plan": self._deployment_launch_plan,
+                "deployment_readiness": self._deployment_readiness,
             }
         state = self._orchestrator.get_state()
         state["deployment_profile"] = self._deployment_profile
         state["deployment_preflight"] = self._deployment_preflight
         state["deployment_launch_plan"] = self._deployment_launch_plan
+        state["deployment_readiness"] = self._deployment_readiness
         return state
 
     def start(self) -> Dict[str, Any]:
