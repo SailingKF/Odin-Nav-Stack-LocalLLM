@@ -302,6 +302,11 @@
         <div id="statePanel" class="kv"></div>
       </section>
 
+      <section class="card">
+        <h2>Audio Summary</h2>
+        <div id="audioPanel" class="kv"></div>
+      </section>
+
       <section class="card stack">
         <h2>Follow-up Question</h2>
         <div>
@@ -330,6 +335,7 @@
       feedback: document.getElementById("feedback"),
       healthPanel: document.getElementById("healthPanel"),
       statePanel: document.getElementById("statePanel"),
+      audioPanel: document.getElementById("audioPanel"),
       sessionPanel: document.getElementById("sessionPanel"),
       answerPanel: document.getElementById("answerPanel"),
       questionInput: document.getElementById("questionInput"),
@@ -449,6 +455,20 @@
         ["Last Pose", state.last_pose],
         ["Session Log", state.session_log_path],
       ]);
+
+      const audio = state.audio_summary || {};
+      renderKeyValue(elements.audioPanel, [
+        ["Summary Status", audio.summary_status],
+        ["Active Playback", audio.active_playback_status],
+        ["Active Kind", audio.active_playback_kind],
+        ["Queued Count", audio.queued_count],
+        ["Latest Completion", audio.latest_completion_source],
+        ["Latest Failure", audio.latest_failure_source],
+        ["Failure Status", audio.latest_failure_status],
+        ["Degraded Continuation", audio.degraded_continuation_applied],
+        ["Handle Status", audio.latest_handle_status],
+        ["Latest Lifecycle", audio.latest_lifecycle_event],
+      ]);
     }
 
     async function refreshLatestSession() {
@@ -462,6 +482,7 @@
         ["Latest Pose", session.latest_pose],
         ["Narration", session.latest_narration_text],
         ["Latest Answer", session.latest_answer_text],
+        ["Audio Summary", session.audio_summary],
         ["Session Log", session.session_log_path],
       ]);
     }

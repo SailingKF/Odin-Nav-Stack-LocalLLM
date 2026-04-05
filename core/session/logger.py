@@ -8,6 +8,57 @@ from core.interfaces.session_store import SessionStore
 from core.poi.models import POI
 
 
+def _latest_event_by_type(events: List[Dict[str, Any]], event_type: str) -> Optional[Dict[str, Any]]:
+    return next((item for item in reversed(events) if item.get("event_type") == event_type), None)
+
+
+def build_audio_summary_from_latest_audio_playback(
+    latest_audio_playback: Optional[Dict[str, Any]],
+    completion_event: Optional[Dict[str, Any]] = None,
+    failure_event: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    extra = {} if latest_audio_playback is None else dict(latest_audio_playback.get("extra") or {})
+    metadata = dict(extra.get("metadata") or {})
+    completion_extra = {} if completion_event is None else dict(completion_event.get("extra") or {})
+    failure_extra = {} if failure_event is None else dict(failure_event.get("extra") or {})
+
+    latest_completion_source = completion_extra.get("completion_source") or metadata.get("playback_completion_source")
+    latest_failure_source = failure_extra.get("failure_source") or metadata.get("playback_failure_source")
+    latest_failure_status = failure_extra.get("failure_status") or metadata.get("failure_status")
+    latest_failure_message = failure_extra.get("failure_message") or metadata.get("failure_message")
+    degraded_continuation_applied = bool(
+        failure_extra.get("degraded_continuation_policy") or metadata.get("degraded_continuation_applied")
+    )
+    active_playback_status = None
+    if latest_audio_playback is not None:
+        active_playback_status = extra.get("status") or metadata.get("player_status")
+
+    if active_playback_status in {"started", "played"}:
+        summary_status = "active"
+    elif latest_failure_source:
+        summary_status = "degraded"
+    elif active_playback_status == "prepared":
+        summary_status = "queued"
+    else:
+        summary_status = "idle"
+
+    return {
+        "summary_status": summary_status,
+        "active_playback_status": active_playback_status,
+        "active_playback_kind": extra.get("playback_kind"),
+        "active_output_type": extra.get("output_type"),
+        "queued_count": 1 if metadata.get("lifecycle_action") == "queued" else 0,
+        "latest_lifecycle_action": metadata.get("lifecycle_action"),
+        "latest_completion_source": latest_completion_source,
+        "latest_failure_source": latest_failure_source,
+        "latest_failure_status": latest_failure_status,
+        "latest_failure_message": latest_failure_message,
+        "latest_handle_status": metadata.get("latest_playback_handle_status"),
+        "degraded_continuation_applied": degraded_continuation_applied,
+        "degraded_continuation_policy": failure_extra.get("degraded_continuation_policy"),
+    }
+
+
 class JsonlSessionStore(SessionStore):
     def __init__(self, session_log_dir: str) -> None:
         self._session_log_dir = Path(session_log_dir)
@@ -97,6 +148,7 @@ class JsonlSessionStore(SessionStore):
 
     def get_current_session_summary(self) -> Dict[str, Any]:
         latest = self._latest_event or {}
+        audio_summary = build_audio_summary_from_latest_audio_playback(self._latest_audio_playback)
         return {
             "session_id": self._session_id,
             "session_log_path": None if self._output_path is None else str(self._output_path),
@@ -109,6 +161,7 @@ class JsonlSessionStore(SessionStore):
             "latest_narration_text": self._latest_narration_text,
             "latest_answer_text": self._latest_answer_text,
             "latest_audio_playback": self._latest_audio_playback,
+            "audio_summary": audio_summary,
         }
 
     def get_latest_session_summary(self) -> Dict[str, Any]:
@@ -157,6 +210,27 @@ class JsonlSessionStore(SessionStore):
             (item.get("narration_text") for item in reversed(events) if item.get("event_type") == "question_answered" and item.get("narration_text")),
             None,
         )
+        latest_audio_playback = next(
+            (
+                {
+                    "event_type": item.get("event_type"),
+                    "state": item.get("state"),
+                    "pose": item.get("pose"),
+                    "spot_id": item.get("spot_id"),
+                    "spot_name": item.get("spot_name"),
+                    "text": item.get("narration_text"),
+                    "extra": item.get("extra") or {},
+                }
+                for item in reversed(events)
+                if item.get("event_type") == "audio_playback_requested"
+            ),
+            None,
+        )
+        audio_summary = build_audio_summary_from_latest_audio_playback(
+            latest_audio_playback=latest_audio_playback,
+            completion_event=_latest_event_by_type(events, "playback_completed"),
+            failure_event=_latest_event_by_type(events, "playback_failed"),
+        )
         return {
             "session_id": latest.get("session_id"),
             "session_log_path": str(latest_path),
@@ -168,20 +242,6 @@ class JsonlSessionStore(SessionStore):
             "latest_spot_name": latest.get("spot_name"),
             "latest_narration_text": latest_narration,
             "latest_answer_text": latest_answer,
-            "latest_audio_playback": next(
-                (
-                    {
-                        "event_type": item.get("event_type"),
-                        "state": item.get("state"),
-                        "pose": item.get("pose"),
-                        "spot_id": item.get("spot_id"),
-                        "spot_name": item.get("spot_name"),
-                        "text": item.get("narration_text"),
-                        "extra": item.get("extra") or {},
-                    }
-                    for item in reversed(events)
-                    if item.get("event_type") == "audio_playback_requested"
-                ),
-                None,
-            ),
+            "latest_audio_playback": latest_audio_playback,
+            "audio_summary": audio_summary,
         }

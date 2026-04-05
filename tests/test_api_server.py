@@ -62,6 +62,7 @@ class ApiServerTests(unittest.TestCase):
         self.assertIn("audio_output_type", payload)
         self.assertIn("audio_playback_state", payload)
         self.assertIn("last_audio_playback", payload)
+        self.assertIn("audio_summary", payload)
 
     def test_debug_page_is_served_for_mobile_use(self) -> None:
         response = self.client.get("/debug")
@@ -73,6 +74,8 @@ class ApiServerTests(unittest.TestCase):
         self.assertIn("Refresh Status", response.text)
         self.assertIn("http://127.0.0.1:8000", response.text)
         self.assertIn("Ask Question", response.text)
+        self.assertIn("Audio Summary", response.text)
+        self.assertIn("Latest Failure", response.text)
 
     def test_control_endpoints_and_latest_session(self) -> None:
         start_response = self.client.post("/tour/start")
@@ -103,6 +106,7 @@ class ApiServerTests(unittest.TestCase):
         self.assertIn("latest_state", session_payload)
         self.assertIn("latest_narration_text", session_payload)
         self.assertIn("latest_audio_playback", session_payload)
+        self.assertIn("audio_summary", session_payload)
 
     def test_question_endpoint_returns_answer(self) -> None:
         self.client.post("/tour/start")
@@ -193,6 +197,10 @@ class ApiServerTests(unittest.TestCase):
                 state_payload["audio_playback_state"]["policy_name"],
                 "answers_interrupt_active_playback__narration_queues_fifo",
             )
+            self.assertIn("audio_summary", state_payload)
+            self.assertIn("queued_count", state_payload["audio_summary"])
+            self.assertIn("audio_summary", payload)
+            self.assertEqual(payload["audio_summary"]["active_output_type"], "tts_service")
         finally:
             self._wait_until_runtime_stops(runtime)
 

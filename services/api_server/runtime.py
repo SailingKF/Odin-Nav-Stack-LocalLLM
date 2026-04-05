@@ -8,8 +8,44 @@ from adapters.mock.mock_pose_provider import MockPoseProvider
 from core.narrator.factory import build_narrator
 from core.poi.loader import load_pois, load_route
 from core.poi.store import InMemoryPoiStore
-from core.session.logger import JsonlSessionStore
+from core.session.logger import JsonlSessionStore, build_audio_summary_from_latest_audio_playback
 from core.tour_orchestrator.orchestrator import TourOrchestrator
+
+
+def _build_audio_summary(
+    playback_state: Optional[Dict[str, Any]],
+    latest_audio_playback: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    if playback_state is None:
+        return build_audio_summary_from_latest_audio_playback(latest_audio_playback)
+
+    active = playback_state.get("active_playback") or {}
+    queued = playback_state.get("queued_playbacks") or []
+    recent_events = playback_state.get("recent_events") or []
+    completion_event = next((item for item in reversed(recent_events) if item.get("event_type") == "playback_completed"), None)
+    failure_event = next((item for item in reversed(recent_events) if item.get("event_type") == "playback_failed"), None)
+    latest_lifecycle_event = recent_events[-1].get("event_type") if recent_events else None
+    summary = build_audio_summary_from_latest_audio_playback(
+        latest_audio_playback=latest_audio_playback,
+        completion_event=completion_event,
+        failure_event=failure_event,
+    )
+    active_metadata = dict(active.get("metadata") or {})
+    summary.update(
+        {
+            "summary_status": "active"
+            if active
+            else ("queued" if queued else ("degraded" if summary.get("latest_failure_source") else "idle")),
+            "active_playback_status": active.get("status") or summary.get("active_playback_status"),
+            "active_playback_kind": active.get("playback_kind") or summary.get("active_playback_kind"),
+            "active_output_type": active.get("output_type") or summary.get("active_output_type"),
+            "queued_count": len(queued),
+            "latest_lifecycle_event": latest_lifecycle_event,
+            "latest_handle_status": active_metadata.get("latest_playback_handle_status")
+            or summary.get("latest_handle_status"),
+        }
+    )
+    return summary
 
 
 class MockTourApiRuntime:
@@ -100,9 +136,15 @@ class MockTourApiRuntime:
                 "audio_output_type": self._config.get("audio_output_type", "mock"),
                 "audio_playback_state": None,
                 "last_audio_playback": None,
+                "audio_summary": _build_audio_summary(None, None),
                 "session_log_path": None,
             }
-        return self._orchestrator.get_state()
+        state = self._orchestrator.get_state()
+        state["audio_summary"] = _build_audio_summary(
+            playback_state=state.get("audio_playback_state"),
+            latest_audio_playback=state.get("last_audio_playback"),
+        )
+        return state
 
     def start_tour(self) -> Dict[str, Any]:
         if self._config["pose_provider_type"] != "mock":
@@ -132,8 +174,16 @@ class MockTourApiRuntime:
 
     def latest_session(self) -> Dict[str, Any]:
         if self._orchestrator is not None:
-            return self._orchestrator.get_latest_session_summary()
-        return JsonlSessionStore.read_latest_session_summary(self._session_log_dir)
+            summary = self._orchestrator.get_latest_session_summary()
+            current_state = self.state()
+            summary["audio_summary"] = current_state.get("audio_summary")
+            return summary
+        summary = JsonlSessionStore.read_latest_session_summary(self._session_log_dir)
+        summary["audio_summary"] = _build_audio_summary(
+            playback_state=None,
+            latest_audio_playback=summary.get("latest_audio_playback"),
+        )
+        return summary
 
     def ask_question(self, question: str) -> Dict[str, Any]:
         if self._orchestrator is None:

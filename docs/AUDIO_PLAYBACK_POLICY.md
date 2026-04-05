@@ -122,6 +122,12 @@ Playback lifecycle state is exposed through:
 
 - `audio_playback_state`
 
+Operator-facing concise summary surfaces now also exist in:
+
+- API `audio_summary`
+- session summary `audio_summary`
+- `/debug` Audio Summary panel
+
 Current state shape includes:
 
 - `policy_name`
@@ -129,6 +135,16 @@ Current state shape includes:
 - `active_playback`
 - `queued_playbacks`
 - `recent_events`
+
+The concise summary is intentionally smaller and highlights:
+
+- active playback status
+- queued count
+- latest completion source
+- latest failure source / status
+- degraded continuation state
+
+Use raw `audio_playback_state` when you need full lifecycle or backend observation detail.
 
 Each playback item carries:
 

@@ -468,6 +468,29 @@ What `playback_failed` events now distinguish:
 - `failure_source: "start_failed"`
 - `failure_source: "backend_reported"`
 
+## Audio Observability Surface Baseline
+
+This iteration adds a concise audio summary on top of the raw playback lifecycle state so operators can quickly inspect audio behavior from the API and `/debug` page.
+
+New summary surfaces now expose:
+- active playback status
+- active playback kind / output type
+- queued count
+- latest completion source
+- latest failure source and status
+- whether degraded continuation was applied
+- latest handle status
+
+Where the summary is now visible:
+- `GET /state` as `audio_summary`
+- `GET /session/latest` as `audio_summary`
+- `/debug` in the new `Audio Summary` panel
+
+What still remains raw-only:
+- detailed lifecycle event history
+- full active / queued playback item metadata
+- recent low-level backend observations in `audio_playback_state`
+
 Focused contract docs:
 - `docs/TTS_SERVICE_CONTRACT.md`
 - `docs/ARTIFACT_PLAYER_BACKEND.md`
