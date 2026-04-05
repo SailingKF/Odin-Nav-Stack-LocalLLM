@@ -323,6 +323,9 @@ Prompting approach:
 - follow-up answers use the current POI FAQ, facts, and base text
 - prompts explicitly tell the model to stay within the supplied content
 
+Focused prompt/content contract:
+- `docs/LLM_PROMPT_CONTRACT.md`
+
 Ollama / Gemma note:
 - this repository does not hardcode one exact Gemma runtime tag
 - set `llm_model_name` to the model tag that exists in your local runtime

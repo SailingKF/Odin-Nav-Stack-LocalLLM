@@ -4,12 +4,13 @@ pois:
     x: 0.0
     y: 0.0
     trigger_radius: 1.2
-    short_text: "Welcome to the East Gate, the opening stop of the mock tour."
-    standard_text: "Welcome to the East Gate. This is the opening stop for the mock guided tour and the handoff point into the structured narration system."
-    extended_text: "Welcome to the East Gate. This opening stop is used to validate that the tour can trigger a short introduction, a standard explanation, or an extended guided version without changing the orchestrator flow."
+    short_text: "Welcome to the East Gate, the opening stop of the demo tour."
+    standard_text: "Welcome to the East Gate. This first stop introduces the route and confirms that the guided tour can trigger narration as soon as the robot reaches a POI."
+    extended_text: "Welcome to the East Gate. This first stop introduces the route, confirms that narration starts as soon as a POI is reached, and gives us a clean handoff into the structured guide flow before the rest of the tour continues."
     facts:
       - "The East Gate is the first POI in the demo route."
       - "It is used to verify the first narration trigger in mock mode."
+      - "This stop is the initial handoff point into the narrator pipeline."
     faq:
       - question: "Why does the tour start here?"
         answer: "The East Gate is configured as the first stop so we can verify the route enters a POI and triggers narration immediately."
@@ -25,12 +26,13 @@ pois:
     x: 5.0
     y: 1.0
     trigger_radius: 1.0
-    short_text: "This is the Central Plaza, a shared activity area in the demo route."
-    standard_text: "This central plaza is our shared activity area and a good checkpoint for route validation."
-    extended_text: "This central plaza is our shared activity area and a useful mid-route checkpoint. In the mock stack it helps confirm that the system can continue through multiple POIs while preserving state transitions and narrator output."
+    short_text: "This is the Central Plaza, the mid-route checkpoint in the demo tour."
+    standard_text: "This central plaza is the mid-route checkpoint in the demo tour. It helps us verify that state transitions and narration continue cleanly after the first stop."
+    extended_text: "This central plaza is the mid-route checkpoint in the demo tour. It confirms that the route can progress beyond the opening stop while preserving stable state transitions, clean trigger behavior, and consistent narrator output."
     facts:
       - "The plaza is the second stop in the demo route."
       - "Its position helps verify mid-route trigger behavior."
+      - "It is used to confirm that narration continues correctly after the first POI."
     faq:
       - question: "Why is the plaza important?"
         answer: "It gives us a mid-route stop to confirm the tour can continue after the first narration event."
@@ -46,12 +48,13 @@ pois:
     x: 9.5
     y: -0.5
     trigger_radius: 1.1
-    short_text: "This is the History Gallery, the final stop in the demo route."
-    standard_text: "The history gallery stop proves that the mock adapter can continue through multiple POIs without duplicate triggers."
-    extended_text: "The history gallery is the final stop in the demo route. It demonstrates that the tour can complete a multi-POI run, emit a final narration, and finish with a clean session summary that is still suitable for later LLM enhancement."
+    short_text: "This is the History Gallery, the final stop in the demo tour."
+    standard_text: "The History Gallery is the final stop in the demo tour. It shows that the guide flow can finish a multi-POI route without duplicate triggers."
+    extended_text: "The History Gallery is the final stop in the demo tour. It shows that the guide flow can finish a multi-POI route, deliver a final narration, and end with a clean session summary that still leaves room for later LLM upgrades."
     facts:
       - "The gallery is the last POI in the demo route."
       - "It is used to verify final narration and route completion."
+      - "It helps validate that the session can end cleanly after multiple narrations."
     faq:
       - question: "What does this final stop prove?"
         answer: "It proves that the route can finish cleanly after several narrations without duplicate triggers."
