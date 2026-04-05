@@ -12,6 +12,7 @@ if str(REPO_ROOT) not in sys.path:
 from services.deployment_profile import (
     build_bringup_verification_sheet,
     build_deployment_command_manifest,
+    build_deployment_endpoint_contract,
     build_deployment_launch_plan,
     build_deployment_preflight,
     build_deployment_profile,
@@ -47,13 +48,21 @@ def main() -> None:
     deployment_profile = build_deployment_profile(config)
     deployment_preflight = build_deployment_preflight(config, REPO_ROOT)
     deployment_launch_plan = build_deployment_launch_plan(config)
+    deployment_endpoint_contract = build_deployment_endpoint_contract(config, deployment_launch_plan)
     deployment_readiness = build_deployment_readiness(
         deployment_profile,
         deployment_preflight,
         deployment_launch_plan,
     )
-    deployment_command_manifest = build_deployment_command_manifest(config, deployment_launch_plan)
-    deployment_verification_manifest = build_deployment_verification_manifest(deployment_command_manifest)
+    deployment_command_manifest = build_deployment_command_manifest(
+        config,
+        deployment_launch_plan,
+        deployment_endpoint_contract,
+    )
+    deployment_verification_manifest = build_deployment_verification_manifest(
+        deployment_command_manifest,
+        deployment_endpoint_contract,
+    )
     bringup_verification_sheet = build_bringup_verification_sheet(
         deployment_readiness,
         deployment_command_manifest,

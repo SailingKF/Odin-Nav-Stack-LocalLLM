@@ -809,6 +809,57 @@ What this still does not do:
 Focused contract doc:
 - `docs/DEPLOYMENT_VERIFICATION_RUNNER_CONTRACT.md`
 
+## Deployment Endpoint Contract And Config-Driven Targets
+
+This iteration adds a narrow endpoint-contract layer so repo-owned service URLs and ports derive from one explicit source instead of being re-typed across command and verification layers.
+
+Current runtime-visible surface:
+- `deployment_endpoint_contract`
+
+What this makes easier to see:
+- which host and port each repo-owned internal service assumes
+- which values currently come from config
+- which values currently fall back to defaults
+- how command argv and verification URLs stay aligned
+
+Current services covered:
+- `llm_gateway`
+- `api_server`
+- `sim_pose_ingress_server`
+
+Current derivation behavior:
+- `llm_gateway`
+  - verification/command target derives from `llm_gateway_url` when configured
+- `api_server`
+  - defaults to `0.0.0.0:8000` bind with `http://127.0.0.1:8000` local connect URL unless overridden
+- `sim_pose_ingress_server`
+  - defaults to `127.0.0.1:8100` unless overridden
+
+How to inspect it now:
+```shell
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/state
+python scripts/print_endpoint_contract.py --config configs/dev.yaml
+python scripts/print_endpoint_contract.py --config configs/edge.yaml
+```
+
+Example optional config override shape:
+```yaml
+service_endpoints:
+  api_server:
+    bind_host: 0.0.0.0
+    connect_host: 127.0.0.1
+    port: 8088
+```
+
+What this still does not do:
+- dynamic service discovery
+- reverse proxying
+- startup automation
+
+Focused contract doc:
+- `docs/DEPLOYMENT_ENDPOINT_CONTRACT.md`
+
 How to validate the service-backed path:
 ```shell
 python scripts/run_mock_tour.py

@@ -26,6 +26,7 @@ Current runtime-facing exposure:
 Related post-start verification layer:
 
 - `deployment_verification_manifest`
+- `deployment_endpoint_contract`
 
 ## Current Top-Level Surface
 
@@ -45,6 +46,7 @@ This means:
 - repo-owned startup commands are available from one reusable place
 - manual/external steps remain visible and explicit
 - the repo still does not auto-run or supervise these commands
+- repo-owned `--host` / `--port` values now derive from the endpoint contract instead of ad hoc defaults
 
 ## Command Entry Shape
 
@@ -65,6 +67,12 @@ Each repo-owned command currently exposes:
 Current command kind:
 
 - `python_script`
+
+Current command argv now reuses:
+
+- `deployment_endpoint_contract`
+
+so repo-owned startup commands stay aligned with downstream verification targets.
 
 ## Step Mapping Shape
 
@@ -179,3 +187,4 @@ It only centralizes:
 For the post-start verification layer built on top of this command mapping, see:
 
 - `docs/DEPLOYMENT_VERIFICATION_MANIFEST_CONTRACT.md`
+- `docs/DEPLOYMENT_ENDPOINT_CONTRACT.md`

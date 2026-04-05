@@ -1,14 +1,12 @@
 from typing import Any, Dict, List, Optional
 
 
-def _base_url_for_step(step_id: str, profile_name: Optional[str]) -> Optional[str]:
-    if step_id == "api_server":
-        return "http://127.0.0.1:8000"
-    if step_id == "llm_gateway":
-        return "http://127.0.0.1:9000"
-    if step_id == "sim_pose_ingress_server":
-        return "http://127.0.0.1:8100"
-    return None
+def _endpoint_by_service_id(deployment_endpoint_contract: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    return {
+        str(item.get("service_id")): item
+        for item in list(deployment_endpoint_contract.get("services") or [])
+        if item.get("service_id")
+    }
 
 
 def _verification_entry(
@@ -20,8 +18,9 @@ def _verification_entry(
     expected_statuses: List[str],
     expected_fields: List[str],
     description: str,
+    endpoint: Optional[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    base_url = _base_url_for_step(str(step.get("step_id")), step.get("profile_name"))
+    base_url = endpoint.get("base_url") if endpoint else None
     return {
         "verification_id": verification_id,
         "step_id": step.get("step_id"),
@@ -42,6 +41,7 @@ def _verification_entry(
 def _build_known_verification(
     step: Dict[str, Any],
     command_by_step_id: Dict[str, Dict[str, Any]],
+    endpoint_by_service_id: Dict[str, Dict[str, Any]],
 ) -> Optional[Dict[str, Any]]:
     step_id = str(step.get("step_id"))
     command = command_by_step_id.get(step_id)
@@ -49,6 +49,7 @@ def _build_known_verification(
         return None
 
     verification_id = f"{step_id}_verification"
+    endpoint = endpoint_by_service_id.get(step_id)
 
     if step_id == "llm_gateway":
         return _verification_entry(
@@ -60,6 +61,7 @@ def _build_known_verification(
             ["ok", "degraded"],
             ["service", "active_backend_type", "fallback_active"],
             "Verify that the local LLM gateway is reachable and exposes a usable backend status.",
+            endpoint,
         )
 
     if step_id == "api_server":
@@ -72,6 +74,7 @@ def _build_known_verification(
             ["ok"],
             ["service", "env_name", "deployment_profile"],
             "Verify that the backend API server is reachable and serving the operator/runtime health surface.",
+            endpoint,
         )
 
     if step_id == "sim_pose_ingress_server":
@@ -84,6 +87,7 @@ def _build_known_verification(
             ["ok"],
             ["service", "ingress_contract", "deployment_profile"],
             "Verify that the sim pose ingress server is reachable and exposes the expected ingress contract.",
+            endpoint,
         )
 
     return None
@@ -91,6 +95,7 @@ def _build_known_verification(
 
 def build_deployment_verification_manifest(
     deployment_command_manifest: Dict[str, Any],
+    deployment_endpoint_contract: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     profile_name = deployment_command_manifest.get("profile_name")
     config_path = deployment_command_manifest.get("config_path")
@@ -100,6 +105,7 @@ def build_deployment_verification_manifest(
         for item in list(deployment_command_manifest.get("commands") or [])
         if item.get("step_id")
     }
+    endpoint_by_service_id = _endpoint_by_service_id(deployment_endpoint_contract or {})
 
     verifications: List[Dict[str, Any]] = []
     step_checks: List[Dict[str, Any]] = []
@@ -107,7 +113,7 @@ def build_deployment_verification_manifest(
     for step in steps:
         step_with_profile = dict(step)
         step_with_profile["profile_name"] = profile_name
-        verification = _build_known_verification(step_with_profile, command_by_step_id)
+        verification = _build_known_verification(step_with_profile, command_by_step_id, endpoint_by_service_id)
         if verification is not None:
             verifications.append(verification)
             verification_type = "repo_verification"

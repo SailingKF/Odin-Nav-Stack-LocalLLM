@@ -7,6 +7,14 @@ def _default_config_path(profile_name: Optional[str]) -> Optional[str]:
     return f"configs/{profile_name}.yaml"
 
 
+def _endpoint_by_service_id(deployment_endpoint_contract: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    return {
+        str(item.get("service_id")): item
+        for item in list(deployment_endpoint_contract.get("services") or [])
+        if item.get("service_id")
+    }
+
+
 def _command_entry(
     command_id: str,
     step: Dict[str, Any],
@@ -14,6 +22,7 @@ def _command_entry(
     argv: List[str],
     description: str,
     config_path: Optional[str],
+    endpoint: Optional[Dict[str, Any]],
 ) -> Dict[str, Any]:
     return {
         "command_id": command_id,
@@ -27,17 +36,27 @@ def _command_entry(
         "config_path": config_path,
         "description": description,
         "owned_by_repo": True,
+        "bind_host": endpoint.get("bind_host") if endpoint else None,
+        "port": endpoint.get("port") if endpoint else None,
+        "base_url": endpoint.get("base_url") if endpoint else None,
     }
 
 
-def _build_known_command(step: Dict[str, Any], config_path: Optional[str]) -> Optional[Dict[str, Any]]:
+def _build_known_command(
+    step: Dict[str, Any],
+    config_path: Optional[str],
+    endpoint_by_service_id: Dict[str, Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
     step_id = str(step.get("step_id"))
     command_id = f"{step_id}_command"
+    endpoint = endpoint_by_service_id.get(step_id)
 
     if step_id == "llm_gateway":
         argv = ["python", "scripts/run_llm_gateway.py"]
         if config_path:
             argv.extend(["--config", config_path])
+        if endpoint:
+            argv.extend(["--host", str(endpoint["bind_host"]), "--port", str(endpoint["port"])])
         return _command_entry(
             command_id,
             step,
@@ -45,12 +64,15 @@ def _build_known_command(step: Dict[str, Any], config_path: Optional[str]) -> Op
             argv,
             "Start the repo-owned local LLM gateway for narrator traffic.",
             config_path,
+            endpoint,
         )
 
     if step_id == "api_server":
         argv = ["python", "scripts/run_api_server.py"]
         if config_path:
             argv.extend(["--config", config_path])
+        if endpoint:
+            argv.extend(["--host", str(endpoint["bind_host"]), "--port", str(endpoint["port"])])
         return _command_entry(
             command_id,
             step,
@@ -58,12 +80,15 @@ def _build_known_command(step: Dict[str, Any], config_path: Optional[str]) -> Op
             argv,
             "Start the operator-facing backend API and /debug control surface.",
             config_path,
+            endpoint,
         )
 
     if step_id == "sim_pose_ingress_server":
         argv = ["python", "scripts/run_sim_pose_ingress_server.py"]
         if config_path:
             argv.extend(["--config", config_path])
+        if endpoint:
+            argv.extend(["--host", str(endpoint["bind_host"]), "--port", str(endpoint["port"])])
         return _command_entry(
             command_id,
             step,
@@ -71,6 +96,7 @@ def _build_known_command(step: Dict[str, Any], config_path: Optional[str]) -> Op
             argv,
             "Start the sim pose ingress HTTP bridge that drives the tour runtime from simulator poses.",
             config_path,
+            endpoint,
         )
 
     return None
@@ -79,10 +105,12 @@ def _build_known_command(step: Dict[str, Any], config_path: Optional[str]) -> Op
 def build_deployment_command_manifest(
     config: Dict[str, Any],
     deployment_launch_plan: Dict[str, Any],
+    deployment_endpoint_contract: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     profile_name = str(config.get("env_name", "")).strip() or None
     config_path = _default_config_path(profile_name)
     steps = list(deployment_launch_plan.get("steps") or [])
+    endpoint_by_service_id = _endpoint_by_service_id(deployment_endpoint_contract or {})
 
     commands: List[Dict[str, Any]] = []
     step_actions: List[Dict[str, Any]] = []
@@ -90,7 +118,7 @@ def build_deployment_command_manifest(
     for step in steps:
         step_with_profile = dict(step)
         step_with_profile["profile_name"] = profile_name
-        command = _build_known_command(step_with_profile, config_path)
+        command = _build_known_command(step_with_profile, config_path, endpoint_by_service_id)
 
         if command is not None:
             commands.append(command)

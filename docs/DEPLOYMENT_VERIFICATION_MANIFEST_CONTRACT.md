@@ -26,6 +26,7 @@ Current runtime-facing exposure:
 Related one-shot execution layer:
 
 - `services/deployment_profile/verification_runner.py`
+- `deployment_endpoint_contract`
 
 ## Current Top-Level Surface
 
@@ -44,6 +45,7 @@ This means:
 - repo-owned post-start verification checks are available from one reusable place
 - manual/external steps remain explicit and intentionally have no repo verification contract
 - the repo still does not auto-poll or wait on long-running services
+- repo-owned verification URLs now derive from the endpoint contract instead of hard-coded defaults
 
 ## Verification Entry Shape
 
@@ -188,3 +190,4 @@ It only centralizes:
 For the one-shot execution and result-summary layer built on top of this manifest, see:
 
 - `docs/DEPLOYMENT_VERIFICATION_RUNNER_CONTRACT.md`
+- `docs/DEPLOYMENT_ENDPOINT_CONTRACT.md`

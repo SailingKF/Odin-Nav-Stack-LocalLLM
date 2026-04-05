@@ -13,6 +13,7 @@ from core.session.logger import JsonlSessionStore, build_audio_lifecycle_session
 from core.tour_orchestrator.orchestrator import TourOrchestrator
 from services.deployment_profile import (
     build_deployment_command_manifest,
+    build_deployment_endpoint_contract,
     build_deployment_launch_plan,
     build_deployment_preflight,
     build_deployment_profile,
@@ -37,6 +38,10 @@ class SimPoseIngressRuntime:
         self._deployment_profile = build_deployment_profile(config)
         self._deployment_preflight = build_deployment_preflight(config, repo_root)
         self._deployment_launch_plan = build_deployment_launch_plan(config)
+        self._deployment_endpoint_contract = build_deployment_endpoint_contract(
+            config,
+            self._deployment_launch_plan,
+        )
         self._deployment_readiness = build_deployment_readiness(
             self._deployment_profile,
             self._deployment_preflight,
@@ -45,9 +50,11 @@ class SimPoseIngressRuntime:
         self._deployment_command_manifest = build_deployment_command_manifest(
             config,
             self._deployment_launch_plan,
+            self._deployment_endpoint_contract,
         )
         self._deployment_verification_manifest = build_deployment_verification_manifest(
             self._deployment_command_manifest,
+            self._deployment_endpoint_contract,
         )
 
     @classmethod
@@ -112,6 +119,7 @@ class SimPoseIngressRuntime:
             "deployment_profile": self._deployment_profile,
             "deployment_preflight": self._deployment_preflight,
             "deployment_launch_plan": self._deployment_launch_plan,
+            "deployment_endpoint_contract": self._deployment_endpoint_contract,
             "deployment_readiness": self._deployment_readiness,
             "deployment_command_manifest": self._deployment_command_manifest,
             "deployment_verification_manifest": self._deployment_verification_manifest,
@@ -142,6 +150,7 @@ class SimPoseIngressRuntime:
                 "deployment_profile": self._deployment_profile,
                 "deployment_preflight": self._deployment_preflight,
                 "deployment_launch_plan": self._deployment_launch_plan,
+                "deployment_endpoint_contract": self._deployment_endpoint_contract,
                 "deployment_readiness": self._deployment_readiness,
                 "deployment_command_manifest": self._deployment_command_manifest,
                 "deployment_verification_manifest": self._deployment_verification_manifest,
@@ -150,6 +159,7 @@ class SimPoseIngressRuntime:
         state["deployment_profile"] = self._deployment_profile
         state["deployment_preflight"] = self._deployment_preflight
         state["deployment_launch_plan"] = self._deployment_launch_plan
+        state["deployment_endpoint_contract"] = self._deployment_endpoint_contract
         state["deployment_readiness"] = self._deployment_readiness
         state["deployment_command_manifest"] = self._deployment_command_manifest
         state["deployment_verification_manifest"] = self._deployment_verification_manifest

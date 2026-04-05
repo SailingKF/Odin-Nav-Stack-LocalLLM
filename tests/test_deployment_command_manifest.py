@@ -2,6 +2,7 @@ import unittest
 
 from services.deployment_profile import (
     build_deployment_command_manifest,
+    build_deployment_endpoint_contract,
     build_deployment_launch_plan,
     build_deployment_preflight,
     build_deployment_profile,
@@ -24,15 +25,18 @@ class DeploymentCommandManifestTests(unittest.TestCase):
         }
 
         launch_plan = build_deployment_launch_plan(config)
-        manifest = build_deployment_command_manifest(config, launch_plan)
+        endpoint_contract = build_deployment_endpoint_contract(config, launch_plan)
+        manifest = build_deployment_command_manifest(config, launch_plan, endpoint_contract)
 
         self.assertEqual(manifest["profile_name"], "dev")
         self.assertEqual(manifest["config_path"], "configs/dev.yaml")
         llm_gateway_command = next(item for item in manifest["commands"] if item["step_id"] == "llm_gateway")
         self.assertEqual(llm_gateway_command["entrypoint_path"], "scripts/run_llm_gateway.py")
         self.assertIn("--config", llm_gateway_command["argv"])
+        self.assertEqual(llm_gateway_command["display_command"], "python scripts/run_llm_gateway.py --config configs/dev.yaml --host 0.0.0.0 --port 9000")
         api_server_command = next(item for item in manifest["commands"] if item["step_id"] == "api_server")
         self.assertEqual(api_server_command["entrypoint_path"], "scripts/run_api_server.py")
+        self.assertEqual(api_server_command["display_command"], "python scripts/run_api_server.py --config configs/dev.yaml --host 0.0.0.0 --port 8000")
         debug_browser_step = next(item for item in manifest["steps"] if item["step_id"] == "debug_browser")
         self.assertFalse(debug_browser_step["command_available"])
         self.assertEqual(debug_browser_step["action_type"], "manual_optional")
@@ -48,10 +52,14 @@ class DeploymentCommandManifestTests(unittest.TestCase):
         }
 
         launch_plan = build_deployment_launch_plan(config)
-        manifest = build_deployment_command_manifest(config, launch_plan)
+        endpoint_contract = build_deployment_endpoint_contract(config, launch_plan)
+        manifest = build_deployment_command_manifest(config, launch_plan, endpoint_contract)
 
         ingress_command = next(item for item in manifest["commands"] if item["step_id"] == "sim_pose_ingress_server")
-        self.assertEqual(ingress_command["display_command"], "python scripts/run_sim_pose_ingress_server.py --config configs/sim.yaml")
+        self.assertEqual(
+            ingress_command["display_command"],
+            "python scripts/run_sim_pose_ingress_server.py --config configs/sim.yaml --host 127.0.0.1 --port 8100",
+        )
         live_step = next(item for item in manifest["steps"] if item["step_id"] == "isaac_live_dependency")
         self.assertFalse(live_step["command_available"])
         self.assertEqual(live_step["action_type"], "manual_external")
@@ -77,8 +85,9 @@ class DeploymentCommandManifestTests(unittest.TestCase):
         profile = build_deployment_profile(config)
         preflight = build_deployment_preflight(config, repo_root=repo_root)
         launch_plan = build_deployment_launch_plan(config)
+        endpoint_contract = build_deployment_endpoint_contract(config, launch_plan)
         readiness = build_deployment_readiness(profile, preflight, launch_plan)
-        manifest = build_deployment_command_manifest(config, launch_plan)
+        manifest = build_deployment_command_manifest(config, launch_plan, endpoint_contract)
         bringup_sheet = build_guided_bringup_sheet(launch_plan, readiness, manifest)
 
         self.assertEqual(bringup_sheet["overall_status"], "blocked")

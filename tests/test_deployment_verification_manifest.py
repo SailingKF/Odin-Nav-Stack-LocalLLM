@@ -3,6 +3,7 @@ import unittest
 from services.deployment_profile import (
     build_bringup_verification_sheet,
     build_deployment_command_manifest,
+    build_deployment_endpoint_contract,
     build_deployment_launch_plan,
     build_deployment_preflight,
     build_deployment_profile,
@@ -25,8 +26,9 @@ class DeploymentVerificationManifestTests(unittest.TestCase):
         }
 
         launch_plan = build_deployment_launch_plan(config)
-        command_manifest = build_deployment_command_manifest(config, launch_plan)
-        verification_manifest = build_deployment_verification_manifest(command_manifest)
+        endpoint_contract = build_deployment_endpoint_contract(config, launch_plan)
+        command_manifest = build_deployment_command_manifest(config, launch_plan, endpoint_contract)
+        verification_manifest = build_deployment_verification_manifest(command_manifest, endpoint_contract)
 
         self.assertEqual(verification_manifest["profile_name"], "dev")
         gateway_verification = next(item for item in verification_manifest["verifications"] if item["step_id"] == "llm_gateway")
@@ -49,8 +51,9 @@ class DeploymentVerificationManifestTests(unittest.TestCase):
         }
 
         launch_plan = build_deployment_launch_plan(config)
-        command_manifest = build_deployment_command_manifest(config, launch_plan)
-        verification_manifest = build_deployment_verification_manifest(command_manifest)
+        endpoint_contract = build_deployment_endpoint_contract(config, launch_plan)
+        command_manifest = build_deployment_command_manifest(config, launch_plan, endpoint_contract)
+        verification_manifest = build_deployment_verification_manifest(command_manifest, endpoint_contract)
 
         ingress_verification = next(
             item for item in verification_manifest["verifications"] if item["step_id"] == "sim_pose_ingress_server"
@@ -79,9 +82,10 @@ class DeploymentVerificationManifestTests(unittest.TestCase):
         profile = build_deployment_profile(config)
         preflight = build_deployment_preflight(config, repo_root=repo_root)
         launch_plan = build_deployment_launch_plan(config)
+        endpoint_contract = build_deployment_endpoint_contract(config, launch_plan)
         readiness = build_deployment_readiness(profile, preflight, launch_plan)
-        command_manifest = build_deployment_command_manifest(config, launch_plan)
-        verification_manifest = build_deployment_verification_manifest(command_manifest)
+        command_manifest = build_deployment_command_manifest(config, launch_plan, endpoint_contract)
+        verification_manifest = build_deployment_verification_manifest(command_manifest, endpoint_contract)
         verification_sheet = build_bringup_verification_sheet(
             readiness,
             command_manifest,
@@ -90,8 +94,11 @@ class DeploymentVerificationManifestTests(unittest.TestCase):
 
         self.assertEqual(verification_sheet["overall_status"], "blocked")
         gateway_step = next(item for item in verification_sheet["steps"] if item["step_id"] == "llm_gateway")
-        self.assertEqual(gateway_step["display_command"], "python scripts/run_llm_gateway.py --config configs/edge.yaml")
-        self.assertEqual(gateway_step["verification_target"], "http://127.0.0.1:9000/health")
+        self.assertEqual(
+            gateway_step["display_command"],
+            "python scripts/run_llm_gateway.py --config configs/edge.yaml --host 0.0.0.0 --port 65500",
+        )
+        self.assertEqual(gateway_step["verification_target"], "http://127.0.0.1:65500/health")
         self.assertIn("ok", gateway_step["expected_statuses"])
         hardware_step = next(item for item in verification_sheet["steps"] if item["step_id"] == "hardware_pose_dependency")
         self.assertFalse(hardware_step["verification_available"])

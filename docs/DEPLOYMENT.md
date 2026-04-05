@@ -171,6 +171,7 @@ See also:
 - `docs/DEPLOYMENT_COMMAND_MANIFEST_CONTRACT.md`
 - `docs/DEPLOYMENT_VERIFICATION_MANIFEST_CONTRACT.md`
 - `docs/DEPLOYMENT_VERIFICATION_RUNNER_CONTRACT.md`
+- `docs/DEPLOYMENT_ENDPOINT_CONTRACT.md`
 
 ---
 
@@ -291,6 +292,13 @@ Current repo-owned bring-up commands are now also available through:
 - `python scripts/print_bringup_sheet.py --config configs/<profile>.yaml`
 
 This command-manifest layer is where launch-plan steps become explicit repo commands versus manual/external operator actions.
+
+Current repo-owned endpoint assumptions are now also available through:
+
+- API `deployment_endpoint_contract`
+- `python scripts/print_endpoint_contract.py --config configs/<profile>.yaml`
+
+This endpoint-contract layer is where repo-owned bind host, connect host, port, and base URL assumptions become explicit and reusable.
 
 Current repo-owned post-start verification checks are now also available through:
 

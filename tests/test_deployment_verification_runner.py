@@ -3,6 +3,7 @@ import unittest
 from services.deployment_profile import (
     build_bringup_verification_sheet,
     build_deployment_command_manifest,
+    build_deployment_endpoint_contract,
     build_deployment_launch_plan,
     build_deployment_verification_manifest,
     build_verification_result_summary,
@@ -24,8 +25,9 @@ class DeploymentVerificationRunnerTests(unittest.TestCase):
             "current_poi_file": "content/poi/demo_pois.yaml",
         }
         launch_plan = build_deployment_launch_plan(config)
-        command_manifest = build_deployment_command_manifest(config, launch_plan)
-        return build_deployment_verification_manifest(command_manifest)
+        endpoint_contract = build_deployment_endpoint_contract(config, launch_plan)
+        command_manifest = build_deployment_command_manifest(config, launch_plan, endpoint_contract)
+        return build_deployment_verification_manifest(command_manifest, endpoint_contract)
 
     def test_runner_reports_passed_result_when_expected_status_and_fields_are_present(self) -> None:
         verification_manifest = self._dev_verification_manifest()
@@ -99,8 +101,9 @@ class DeploymentVerificationRunnerTests(unittest.TestCase):
             "current_poi_file": "content/poi/demo_pois.yaml",
         }
         launch_plan = build_deployment_launch_plan(config)
-        command_manifest = build_deployment_command_manifest(config, launch_plan)
-        verification_manifest = build_deployment_verification_manifest(command_manifest)
+        endpoint_contract = build_deployment_endpoint_contract(config, launch_plan)
+        command_manifest = build_deployment_command_manifest(config, launch_plan, endpoint_contract)
+        verification_manifest = build_deployment_verification_manifest(command_manifest, endpoint_contract)
         bringup_verification_sheet = build_bringup_verification_sheet(
             {"overall_status": "blocked", "blocking_reasons": ["llm gateway down"], "steps": [
                 {
