@@ -1,12 +1,12 @@
 env_name: dev
 pose_provider_type: mock
-narrator_type: mock
+narrator_type: local_llm
 narration_mode_default: standard
 llm_gateway_url: http://127.0.0.1:9000
-llm_backend_type: mock
-llm_model_name: gemma-local
+llm_backend_type: ollama
+llm_model_name: gemma3:4b
 llm_base_url: http://127.0.0.1:11434
-llm_timeout_sec: 8.0
+llm_timeout_sec: 60.0
 llm_enable_fallback: true
 session_log_dir: session_logs/dev
 recording_enabled: false

@@ -270,11 +270,46 @@ Example local-LLM oriented config:
 narrator_type: local_llm
 llm_gateway_url: http://127.0.0.1:9000
 llm_backend_type: ollama
-llm_model_name: gemma-local
+llm_model_name: gemma3:4b
 llm_base_url: http://127.0.0.1:11434
-llm_timeout_sec: 8.0
+llm_timeout_sec: 60.0
 llm_enable_fallback: true
 ```
+
+Quick local runtime check on Windows:
+```shell
+"C:\Users\<you>\AppData\Local\Programs\Ollama\ollama.exe" --version
+"C:\Users\<you>\AppData\Local\Programs\Ollama\ollama.exe" list
+curl http://127.0.0.1:11434/api/tags
+```
+
+Recommended first local model:
+- `gemma3:4b`
+
+Why `gemma3:4b` first:
+- easier to pull and verify than a larger Gemma variant
+- enough to validate narration and follow-up Q&A through the existing gateway
+- keeps the local development path closer to what we can later trim for edge deployment
+
+If the model is missing, pull it with:
+```shell
+"C:\Users\<you>\AppData\Local\Programs\Ollama\ollama.exe" pull gemma3:4b
+```
+
+How to verify real local output through the project:
+1. Start the local model runtime and confirm `gemma3:4b` appears in `/api/tags`
+2. Start the gateway:
+   `python scripts/run_llm_gateway.py --config configs/dev.yaml`
+3. Confirm `/health` reports `configured_backend_type=ollama`, `active_backend_type=ollama`, and `fallback_active=false`
+4. Start the API server:
+   `python scripts/run_api_server.py`
+5. Open `http://127.0.0.1:8000/debug`
+6. Start the tour and ask a follow-up question
+
+If the local model is unavailable:
+- the gateway health becomes `degraded`
+- the narrator falls back to mock output if fallback is enabled
+- the API and `/debug` page stay usable for control-path validation
 
 How real local model integration works:
 - `LocalLLMNarrator` calls the HTTP gateway
