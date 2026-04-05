@@ -3,6 +3,7 @@ pose_provider_type: mock
 narrator_type: local_llm
 audio_output_type: tts_service
 tts_backend_type: mock
+artifact_player_backend_type: mock
 tts_artifact_dir: session_logs/dev_tts_artifacts
 narration_mode_default: standard
 llm_gateway_url: http://127.0.0.1:9000

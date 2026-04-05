@@ -41,6 +41,8 @@ class TTSResponse:
         payload = {
             "backend_type": self.backend_type,
             "status": self.status,
+            "tts_backend_type": self.backend_type,
+            "tts_status": self.status,
             "estimated_duration_ms": self.estimated_duration_ms,
             "metadata": dict(self.metadata),
         }

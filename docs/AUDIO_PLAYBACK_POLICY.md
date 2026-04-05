@@ -57,6 +57,10 @@ The queue manager wraps:
 
 This keeps lifecycle concerns on the audio-output side and keeps synthesis concerns in `services/tts_service/`.
 
+For service-backed playback, actual artifact start / interrupt hooks now live behind:
+
+- `adapters/mock/artifact_player.py`
+
 ## Where Preparation Ends And Playback Start Begins
 
 Preparation now means:
@@ -78,6 +82,7 @@ Playback start now means:
 
 - the prepared item becomes the active playback item
 - the delegate `start_prepared(...)` hook is invoked
+- for service-backed playback, the artifact player backend `start_artifact(...)` hook is invoked
 - `started_at_monotonic` is populated
 - a `playback_started` lifecycle event is recorded
 
@@ -86,6 +91,7 @@ Queued narration therefore stays in `prepared` / `queued` state until activation
 Interruption now means:
 
 - the active playback item is passed through the delegate `interrupt_prepared(...)` hook
+- for service-backed playback, that path calls the artifact player backend `interrupt_handle(...)`
 - a `playback_interrupted` event is recorded
 - a replacement item may then start immediately
 
@@ -114,6 +120,16 @@ Each playback item carries:
 - `duration_ms`
 - `remaining_ms`
 - `metadata`
+
+Service-backed metadata now distinguishes:
+
+- synthesis ownership:
+  - `tts_backend_type`
+  - `artifact`
+- playback backend ownership:
+  - `playback_backend_type`
+  - `playback_handle`
+  - `player_start_hook_invoked`
 
 Lifecycle events now include:
 

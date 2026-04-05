@@ -394,6 +394,37 @@ Current service-backed behavior:
   - estimated duration
   - artifact URI, kind, mime type, and content hash
 
+## Artifact Player Backend Baseline
+
+This iteration adds an explicit playback backend seam after synthesis so service-backed audio no longer treats a synthesized artifact as implicitly playable.
+
+What is included:
+- `adapters/mock/artifact_player.py`
+- a `MockArtifactPlayerBackend`
+- service-backed audio start routed through `start_artifact(...)`
+- service-backed interruption routed through `interrupt_handle(...)`
+
+Current config knob:
+```yaml
+artifact_player_backend_type: mock
+```
+
+What runtime and session metadata now show:
+- synthesis ownership:
+  - `tts_backend_type`
+  - `tts_status`
+  - `artifact`
+- playback backend ownership:
+  - `playback_backend_type`
+  - `playback_handle`
+  - `player_start_hook_invoked`
+  - `player_interrupt_hook_invoked`
+
+Focused contract docs:
+- `docs/TTS_SERVICE_CONTRACT.md`
+- `docs/ARTIFACT_PLAYER_BACKEND.md`
+- `docs/AUDIO_PLAYBACK_POLICY.md`
+
 How to validate the service-backed path:
 ```shell
 python scripts/run_mock_tour.py
@@ -401,8 +432,8 @@ python -m unittest tests.test_tts_service -v
 ```
 
 What you should see:
-- `[AUDIO] narration via tts_service/mock: ...`
-- `[AUDIO] answer via tts_service/mock: ...`
+- `[AUDIO] narration via artifact_player/mock: ...`
+- `[AUDIO] answer via artifact_player/mock: ...`
 - `latest_audio_playback.extra.metadata.backend_type == "mock"`
 - a generated mock synthesis artifact under the configured `tts_artifact_dir`
 

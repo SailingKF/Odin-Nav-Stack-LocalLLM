@@ -1,0 +1,98 @@
+from abc import ABC, abstractmethod
+from dataclasses import asdict, dataclass, field
+from typing import Any, Callable, Dict, List, Optional
+
+
+@dataclass(frozen=True)
+class ArtifactPlaybackRequest:
+    artifact_uri: str
+    artifact_kind: str
+    mime_type: str
+    content_hash: Optional[str]
+    text: str
+    playback_kind: str
+    session_id: Optional[str] = None
+    spot_id: Optional[str] = None
+    spot_name: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ArtifactPlaybackHandle:
+    backend_type: str
+    handle_id: str
+    status: str
+    artifact_uri: str
+    artifact_kind: str
+    mime_type: str
+    content_hash: Optional[str]
+    playback_kind: str
+    session_id: Optional[str] = None
+    spot_id: Optional[str] = None
+    spot_name: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_metadata_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+class ArtifactPlayerBackend(ABC):
+    @abstractmethod
+    def start_artifact(self, request: ArtifactPlaybackRequest) -> ArtifactPlaybackHandle:
+        """Start playback for a synthesized artifact."""
+
+    @abstractmethod
+    def interrupt_handle(self, handle: ArtifactPlaybackHandle) -> Dict[str, Any]:
+        """Interrupt a previously started artifact playback handle."""
+
+
+class MockArtifactPlayerBackend(ArtifactPlayerBackend):
+    backend_type = "mock_artifact_player"
+
+    def __init__(self, event_callback: Optional[Callable[[str], None]] = None) -> None:
+        self._event_callback = event_callback
+        self.start_history: List[ArtifactPlaybackHandle] = []
+        self.interrupt_history: List[Dict[str, Any]] = []
+        self._next_handle_id = 1
+
+    def start_artifact(self, request: ArtifactPlaybackRequest) -> ArtifactPlaybackHandle:
+        handle = ArtifactPlaybackHandle(
+            backend_type=self.backend_type,
+            handle_id=f"artifact-playback-{self._next_handle_id}",
+            status="started",
+            artifact_uri=request.artifact_uri,
+            artifact_kind=request.artifact_kind,
+            mime_type=request.mime_type,
+            content_hash=request.content_hash,
+            playback_kind=request.playback_kind,
+            session_id=request.session_id,
+            spot_id=request.spot_id,
+            spot_name=request.spot_name,
+            metadata=dict(request.metadata),
+        )
+        self._next_handle_id += 1
+        self.start_history.append(handle)
+        if self._event_callback is not None:
+            label = request.spot_name or request.spot_id or "tour"
+            self._event_callback(f"[AUDIO] {request.playback_kind} via artifact_player/mock: {label}")
+        return handle
+
+    def interrupt_handle(self, handle: ArtifactPlaybackHandle) -> Dict[str, Any]:
+        payload = {
+            "playback_backend_type": handle.backend_type,
+            "playback_handle_id": handle.handle_id,
+            "player_interrupt_hook_invoked": True,
+            "player_interrupt_status": "artifact_player_interrupted",
+        }
+        self.interrupt_history.append(payload)
+        return payload
+
+
+def build_artifact_player_backend(
+    config: Dict[str, Any],
+    event_callback: Optional[Callable[[str], None]] = None,
+) -> ArtifactPlayerBackend:
+    backend_type = str(config.get("artifact_player_backend_type", "mock"))
+    if backend_type == "mock":
+        return MockArtifactPlayerBackend(event_callback=event_callback)
+    raise ValueError(f"Unsupported artifact player backend type: {backend_type}")

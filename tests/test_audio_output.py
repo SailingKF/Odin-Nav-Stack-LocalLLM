@@ -76,10 +76,14 @@ class AudioOutputTests(unittest.TestCase):
             self.assertEqual(result.output_type, "tts_service")
             self.assertEqual(result.status, "started")
             self.assertEqual(result.metadata["backend_type"], "mock")
+            self.assertEqual(result.metadata["tts_backend_type"], "mock")
             self.assertEqual(result.metadata["status"], "synthesized")
+            self.assertEqual(result.metadata["playback_backend_type"], "mock_artifact_player")
+            self.assertEqual(result.metadata["playback_handle"]["backend_type"], "mock_artifact_player")
             self.assertTrue(Path(result.metadata["artifact"]["artifact_uri"]).exists())
             self.assertEqual(result.metadata["lifecycle_action"], "started")
             self.assertTrue(result.metadata["start_hook_invoked"])
+            self.assertTrue(result.metadata["player_start_hook_invoked"])
 
     def test_managed_audio_output_queues_second_narration(self) -> None:
         clock = _FakeClock()
@@ -204,10 +208,18 @@ class AudioOutputTests(unittest.TestCase):
         )
         self.assertEqual(state["last_audio_playback"]["extra"]["status"], "started")
         self.assertTrue(state["last_audio_playback"]["extra"]["metadata"]["start_hook_invoked"])
+        self.assertEqual(
+            state["last_audio_playback"]["extra"]["metadata"]["playback_backend_type"],
+            "mock_artifact_player",
+        )
         self.assertEqual(session_summary["latest_audio_playback"]["extra"]["output_type"], "tts_service")
         self.assertEqual(
             session_summary["latest_audio_playback"]["extra"]["metadata"]["backend_type"],
             "mock",
+        )
+        self.assertEqual(
+            session_summary["latest_audio_playback"]["extra"]["metadata"]["playback_backend_type"],
+            "mock_artifact_player",
         )
 
 

@@ -70,6 +70,18 @@ This lets downstream audio output verify:
 - which backend handled it
 - what artifact metadata came back
 
+Current synthesis metadata now also exposes:
+
+- `tts_backend_type`
+- `tts_status`
+
+The legacy keys:
+
+- `backend_type`
+- `status`
+
+remain present for compatibility with earlier development rounds.
+
 ## Service-Backed Audio Path
 
 Service-backed audio output lives in:
@@ -81,8 +93,12 @@ That path:
 
 - accepts a normal `AudioPlaybackRequest`
 - calls `TTSService.synthesize(...)`
-- converts the synthesis result into an `AudioPlaybackResult`
-- preserves orchestrator independence from concrete TTS details
+- hands the synthesized artifact to an explicit artifact playback backend
+- preserves orchestrator independence from concrete TTS and playback details
+
+Playback backend details are defined in:
+
+- `docs/ARTIFACT_PLAYER_BACKEND.md`
 
 ## Current Config Knobs
 
@@ -91,6 +107,7 @@ Current config fields:
 ```yaml
 audio_output_type: tts_service
 tts_backend_type: mock
+artifact_player_backend_type: mock
 tts_artifact_dir: session_logs/dev_tts_artifacts
 ```
 
@@ -108,6 +125,6 @@ Current TTS backend modes:
 
 - selecting a real engine
 - filling in a real backend implementation
-- deciding playback queueing or interruption semantics
+- filling in a real playback backend implementation
 - deciding file vs stream transport
 - choosing device/output routing behavior

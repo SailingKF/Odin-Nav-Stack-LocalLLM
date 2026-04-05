@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from adapters.mock.artifact_player import ArtifactPlaybackHandle, ArtifactPlaybackRequest, build_artifact_player_backend
 from core.interfaces.audio_output import AudioOutput, AudioPlaybackRequest, AudioPlaybackResult
 from services.tts_service.service import TTSService, TTSRequest, TTSResponse, build_tts_service
 
@@ -146,9 +147,13 @@ class SilentAudioOutput(AudioOutput, _PreparedAudioDelegate):
 class ServiceBackedTTSAudioOutput(AudioOutput, _PreparedAudioDelegate):
     output_type = "tts_service"
 
-    def __init__(self, tts_service: TTSService, event_callback: Optional[Callable[[str], None]] = None) -> None:
+    def __init__(
+        self,
+        tts_service: TTSService,
+        artifact_player_backend: Any,
+    ) -> None:
         self._tts_service = tts_service
-        self._event_callback = event_callback
+        self._artifact_player_backend = artifact_player_backend
         self.history: List[AudioPlaybackResult] = []
         self.interrupt_history: List[Dict[str, Any]] = []
 
@@ -171,6 +176,33 @@ class ServiceBackedTTSAudioOutput(AudioOutput, _PreparedAudioDelegate):
         )
 
     def start_prepared(self, prepared: _PreparedPlayback) -> AudioPlaybackResult:
+        artifact_metadata = dict(prepared.metadata.get("artifact") or {})
+        if not artifact_metadata:
+            raise ValueError("Service-backed playback requires synthesized artifact metadata before start.")
+        playback_handle = self._artifact_player_backend.start_artifact(
+            ArtifactPlaybackRequest(
+                artifact_uri=str(artifact_metadata.get("artifact_uri")),
+                artifact_kind=str(artifact_metadata.get("artifact_kind")),
+                mime_type=str(artifact_metadata.get("mime_type")),
+                content_hash=artifact_metadata.get("content_hash"),
+                text=prepared.request.text,
+                playback_kind=prepared.request.playback_kind,
+                session_id=prepared.request.session_id,
+                spot_id=prepared.request.spot_id,
+                spot_name=prepared.request.spot_name,
+                metadata={
+                    "tts_backend_type": prepared.metadata.get("tts_backend_type", prepared.metadata.get("backend_type")),
+                    "tts_status": prepared.metadata.get("tts_status", prepared.metadata.get("status")),
+                },
+            )
+        )
+        prepared.metadata = {
+            **dict(prepared.metadata),
+            "playback_backend_type": playback_handle.backend_type,
+            "playback_handle": playback_handle.to_metadata_dict(),
+            "player_start_hook_invoked": True,
+            "player_status": playback_handle.status,
+        }
         result = AudioPlaybackResult(
             output_type="tts_service",
             playback_kind=prepared.request.playback_kind,
@@ -185,19 +217,48 @@ class ServiceBackedTTSAudioOutput(AudioOutput, _PreparedAudioDelegate):
             },
         )
         self.history.append(result)
-        if self._event_callback is not None:
-            label = prepared.request.spot_name or prepared.request.spot_id or "tour"
-            backend_type = prepared.metadata.get("backend_type", "unknown")
-            self._event_callback(f"[AUDIO] {prepared.request.playback_kind} via tts_service/{backend_type}: {label}")
         return result
 
     def interrupt_prepared(self, prepared: _PreparedPlayback) -> Dict[str, Any]:
+        handle_metadata = dict(prepared.metadata.get("playback_handle") or {})
+        if not handle_metadata:
+            payload = {
+                "interrupt_hook_invoked": True,
+                "interrupt_status": "service_tts_missing_playback_handle",
+                "backend_type": prepared.metadata.get("backend_type"),
+                "tts_backend_type": prepared.metadata.get("tts_backend_type", prepared.metadata.get("backend_type")),
+                "playback_backend_type": prepared.metadata.get("playback_backend_type"),
+                "player_interrupt_hook_invoked": False,
+                "playback_kind": prepared.request.playback_kind,
+                "spot_id": prepared.request.spot_id,
+            }
+            self.interrupt_history.append(payload)
+            return payload
+        interrupt_payload = self._artifact_player_backend.interrupt_handle(
+            ArtifactPlaybackHandle(
+                backend_type=str(handle_metadata.get("backend_type")),
+                handle_id=str(handle_metadata.get("handle_id")),
+                status=str(handle_metadata.get("status")),
+                artifact_uri=str(handle_metadata.get("artifact_uri")),
+                artifact_kind=str(handle_metadata.get("artifact_kind")),
+                mime_type=str(handle_metadata.get("mime_type")),
+                content_hash=handle_metadata.get("content_hash"),
+                playback_kind=str(handle_metadata.get("playback_kind")),
+                session_id=handle_metadata.get("session_id"),
+                spot_id=handle_metadata.get("spot_id"),
+                spot_name=handle_metadata.get("spot_name"),
+                metadata=dict(handle_metadata.get("metadata") or {}),
+            )
+        )
         payload = {
             "interrupt_hook_invoked": True,
             "interrupt_status": "service_tts_interrupted",
             "backend_type": prepared.metadata.get("backend_type"),
+            "tts_backend_type": prepared.metadata.get("tts_backend_type", prepared.metadata.get("backend_type")),
+            "playback_backend_type": prepared.metadata.get("playback_backend_type"),
             "playback_kind": prepared.request.playback_kind,
             "spot_id": prepared.request.spot_id,
+            **interrupt_payload,
         }
         self.interrupt_history.append(payload)
         return payload
@@ -408,7 +469,7 @@ def build_audio_output(
         resolved_repo_root = Path.cwd() if repo_root is None else Path(repo_root)
         delegate = ServiceBackedTTSAudioOutput(
             tts_service=build_tts_service(config, repo_root=resolved_repo_root),
-            event_callback=event_callback,
+            artifact_player_backend=build_artifact_player_backend(config, event_callback=event_callback),
         )
         return ManagedAudioOutput(delegate)
 
