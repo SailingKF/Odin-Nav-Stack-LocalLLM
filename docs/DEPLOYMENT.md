@@ -172,6 +172,7 @@ See also:
 - `docs/DEPLOYMENT_VERIFICATION_MANIFEST_CONTRACT.md`
 - `docs/DEPLOYMENT_VERIFICATION_RUNNER_CONTRACT.md`
 - `docs/DEPLOYMENT_ENDPOINT_CONTRACT.md`
+- `docs/DEPLOYMENT_ENDPOINT_CONFIG_CANONICALIZATION.md`
 
 ---
 
@@ -299,6 +300,16 @@ Current repo-owned endpoint assumptions are now also available through:
 - `python scripts/print_endpoint_contract.py --config configs/<profile>.yaml`
 
 This endpoint-contract layer is where repo-owned bind host, connect host, port, and base URL assumptions become explicit and reusable.
+
+Current preferred endpoint config shape is now:
+
+- `service_endpoints.<service_id>`
+
+Current precedence is:
+
+1. canonical endpoint config
+2. legacy compatibility field such as `llm_gateway_url`
+3. default
 
 Current repo-owned post-start verification checks are now also available through:
 

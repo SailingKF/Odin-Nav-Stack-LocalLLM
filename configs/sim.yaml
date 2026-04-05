@@ -12,6 +12,17 @@ llm_model_name: gemma-local
 llm_base_url: http://127.0.0.1:11434
 llm_timeout_sec: 8.0
 llm_enable_fallback: true
+service_endpoints:
+  sim_pose_ingress_server:
+    bind_host: 127.0.0.1
+    connect_host: 127.0.0.1
+    port: 8100
+    scheme: http
+  api_server:
+    bind_host: 0.0.0.0
+    connect_host: 127.0.0.1
+    port: 8000
+    scheme: http
 session_log_dir: session_logs/sim
 recording_enabled: false
 current_route_file: content/routes/demo_route.yaml

@@ -15,6 +15,7 @@ The goal is to keep repo-owned host/port/base-url assumptions in one reusable pl
 Current implementation lives in:
 
 - `services/deployment_profile/endpoint_contract.py`
+- `services/deployment_profile/endpoint_config.py`
 
 Operator-facing inspection entry point:
 
@@ -29,6 +30,7 @@ Current runtime-facing exposure:
 The endpoint contract exposes:
 
 - `profile_name`
+- `preferred_config_shape`
 - `services`
 - `service_count`
 
@@ -62,7 +64,9 @@ These are derived only when the relevant internal-service steps exist in the act
 
 Current behavior:
 
-- `connect_host`, `port`, and `base_url` derive from `llm_gateway_url` when configured
+- the preferred shape is now:
+  - `service_endpoints.llm_gateway`
+- if the canonical shape is absent, `llm_gateway_url` is still honored as a legacy compatibility field
 - `bind_host` defaults to `0.0.0.0` unless explicitly overridden through:
   - `service_endpoints.llm_gateway.bind_host`
 
@@ -149,3 +153,7 @@ It only centralizes:
 - repo-owned endpoint assumptions
 - source-of-value visibility
 - alignment between command, verification, and result-summary layers
+
+For the focused canonicalization rules and precedence story, see:
+
+- `docs/DEPLOYMENT_ENDPOINT_CONFIG_CANONICALIZATION.md`

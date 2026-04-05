@@ -852,6 +852,21 @@ service_endpoints:
     port: 8088
 ```
 
+Preferred endpoint config shape:
+```yaml
+service_endpoints:
+  llm_gateway:
+    bind_host: 0.0.0.0
+    connect_host: 127.0.0.1
+    port: 9000
+    scheme: http
+```
+
+Current precedence rules:
+1. `service_endpoints.<service_id>`
+2. legacy compatibility field such as `llm_gateway_url`
+3. built-in default
+
 What this still does not do:
 - dynamic service discovery
 - reverse proxying
@@ -859,6 +874,7 @@ What this still does not do:
 
 Focused contract doc:
 - `docs/DEPLOYMENT_ENDPOINT_CONTRACT.md`
+- `docs/DEPLOYMENT_ENDPOINT_CONFIG_CANONICALIZATION.md`
 
 How to validate the service-backed path:
 ```shell
