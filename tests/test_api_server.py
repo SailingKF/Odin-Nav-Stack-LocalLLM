@@ -107,6 +107,13 @@ class ApiServerTests(unittest.TestCase):
         self.assertIn("latest_narration_text", session_payload)
         self.assertIn("latest_audio_playback", session_payload)
         self.assertIn("audio_summary", session_payload)
+        self.assertIn("recent_audio_events", session_payload)
+        self.assertTrue(
+            any(
+                item["event_type"] in {"playback_started", "playback_completed"}
+                for item in session_payload["recent_audio_events"]
+            )
+        )
 
     def test_question_endpoint_returns_answer(self) -> None:
         self.client.post("/tour/start")

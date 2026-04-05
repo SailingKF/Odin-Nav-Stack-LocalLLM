@@ -342,10 +342,12 @@ class ManagedAudioOutput(AudioOutput):
         delegate: _PreparedAudioDelegate,
         clock: Optional[Callable[[], float]] = None,
         recent_event_limit: int = 10,
+        lifecycle_event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> None:
         self._delegate = delegate
         self._clock = clock or time.monotonic
         self._recent_event_limit = recent_event_limit
+        self._lifecycle_event_callback = lifecycle_event_callback
         self._active_playback: Optional[Dict[str, Any]] = None
         self._queued_playbacks: List[Dict[str, Any]] = []
         self._recent_events: List[Dict[str, Any]] = []
@@ -380,6 +382,8 @@ class ManagedAudioOutput(AudioOutput):
             "playback_id": item["playback_id"],
             "playback_kind": item["playback_kind"],
             "output_type": item["output_type"],
+            "session_id": item["session_id"],
+            "text": item["text"],
             "spot_id": item["spot_id"],
             "spot_name": item["spot_name"],
             "timestamp_monotonic": now,
@@ -388,6 +392,8 @@ class ManagedAudioOutput(AudioOutput):
         }
         self._recent_events.append(payload)
         self._recent_events = self._recent_events[-self._recent_event_limit :]
+        if self._lifecycle_event_callback is not None:
+            self._lifecycle_event_callback(dict(payload))
 
     def _complete_item(self, item: Dict[str, Any], now: float, completion_source: str, extra: Optional[Dict[str, Any]] = None) -> None:
         item["status"] = "completed"
@@ -637,6 +643,7 @@ def build_audio_output(
     config: Dict[str, Any],
     event_callback: Optional[Callable[[str], None]] = None,
     repo_root: Optional[Path] = None,
+    lifecycle_event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
 ) -> AudioOutput:
     output_type = str(config.get("audio_output_type", "mock"))
     if output_type == "silent":
@@ -648,7 +655,7 @@ def build_audio_output(
             tts_service=build_tts_service(config, repo_root=resolved_repo_root),
             artifact_player_backend=build_artifact_player_backend(config, event_callback=event_callback),
         )
-        return ManagedAudioOutput(delegate)
+        return ManagedAudioOutput(delegate, lifecycle_event_callback=lifecycle_event_callback)
 
     delegate = MockAudioOutput(event_callback=event_callback)
-    return ManagedAudioOutput(delegate)
+    return ManagedAudioOutput(delegate, lifecycle_event_callback=lifecycle_event_callback)

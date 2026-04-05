@@ -8,7 +8,11 @@ from adapters.mock.mock_pose_provider import MockPoseProvider
 from core.narrator.factory import build_narrator
 from core.poi.loader import load_pois, load_route
 from core.poi.store import InMemoryPoiStore
-from core.session.logger import JsonlSessionStore, build_audio_summary_from_latest_audio_playback
+from core.session.logger import (
+    JsonlSessionStore,
+    build_audio_lifecycle_session_persister,
+    build_audio_summary_from_latest_audio_playback,
+)
 from core.tour_orchestrator.orchestrator import TourOrchestrator
 
 
@@ -29,6 +33,7 @@ def _build_audio_summary(
         latest_audio_playback=latest_audio_playback,
         completion_event=completion_event,
         failure_event=failure_event,
+        recent_audio_events=recent_events,
     )
     active_metadata = dict(active.get("metadata") or {})
     summary.update(
@@ -83,7 +88,12 @@ class MockTourApiRuntime:
         pose_provider = MockPoseProvider.from_route_pois(route_pois)
         session_store = JsonlSessionStore(str(self._session_log_dir))
         narrator = build_narrator(self._config)
-        audio_output = build_audio_output(self._config, event_callback=print, repo_root=self._repo_root)
+        audio_output = build_audio_output(
+            self._config,
+            event_callback=print,
+            repo_root=self._repo_root,
+            lifecycle_event_callback=build_audio_lifecycle_session_persister(session_store, route_pois),
+        )
 
         return TourOrchestrator(
             route_pois=route_pois,

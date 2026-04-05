@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from core.interfaces.pose_provider import Pose2D
 from core.interfaces.session_store import SessionStore
@@ -12,13 +12,44 @@ def _latest_event_by_type(events: List[Dict[str, Any]], event_type: str) -> Opti
     return next((item for item in reversed(events) if item.get("event_type") == event_type), None)
 
 
+def _build_recent_audio_events(events: List[Dict[str, Any]], limit: int = 5) -> List[Dict[str, Any]]:
+    return [
+        {
+            "event_type": item.get("event_type"),
+            "state": item.get("state"),
+            "timestamp": item.get("timestamp"),
+            "spot_id": item.get("spot_id"),
+            "spot_name": item.get("spot_name"),
+            "text": item.get("narration_text"),
+            "extra": item.get("extra") or {},
+        }
+        for item in events
+        if item.get("event_type") in {"playback_started", "playback_interrupted", "playback_completed", "playback_failed"}
+    ][-limit:]
+
+
 def build_audio_summary_from_latest_audio_playback(
     latest_audio_playback: Optional[Dict[str, Any]],
     completion_event: Optional[Dict[str, Any]] = None,
     failure_event: Optional[Dict[str, Any]] = None,
+    recent_audio_events: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     extra = {} if latest_audio_playback is None else dict(latest_audio_playback.get("extra") or {})
     metadata = dict(extra.get("metadata") or {})
+    recent_audio_events = list(recent_audio_events or [])
+    if completion_event is None:
+        completion_event = _latest_event_by_type(recent_audio_events, "playback_completed")
+    if failure_event is None:
+        failure_event = _latest_event_by_type(recent_audio_events, "playback_failed")
+    latest_audio_event = next(
+        (
+            item
+            for item in reversed(recent_audio_events)
+            if item.get("event_type") in {"playback_started", "playback_interrupted", "playback_completed", "playback_failed"}
+        ),
+        None,
+    )
+    latest_audio_event_extra = {} if latest_audio_event is None else dict(latest_audio_event.get("extra") or {})
     completion_extra = {} if completion_event is None else dict(completion_event.get("extra") or {})
     failure_extra = {} if failure_event is None else dict(failure_event.get("extra") or {})
 
@@ -29,14 +60,27 @@ def build_audio_summary_from_latest_audio_playback(
     degraded_continuation_applied = bool(
         failure_extra.get("degraded_continuation_policy") or metadata.get("degraded_continuation_applied")
     )
-    active_playback_status = None
-    if latest_audio_playback is not None:
-        active_playback_status = extra.get("status") or metadata.get("player_status")
+    active_playback_status = None if latest_audio_playback is None else extra.get("status") or metadata.get("player_status")
+    latest_lifecycle_event = None if latest_audio_event is None else latest_audio_event.get("event_type")
+    if latest_lifecycle_event == "playback_started":
+        active_playback_status = active_playback_status or "playing"
+    elif latest_lifecycle_event == "playback_interrupted":
+        active_playback_status = "interrupted"
+    elif latest_lifecycle_event == "playback_completed":
+        active_playback_status = "completed"
+    elif latest_lifecycle_event == "playback_failed":
+        active_playback_status = "failed"
 
-    if active_playback_status in {"started", "played"}:
+    if latest_lifecycle_event == "playback_started" or active_playback_status in {"started", "played", "playing"}:
         summary_status = "active"
+    elif latest_lifecycle_event == "playback_interrupted":
+        summary_status = "idle"
     elif latest_failure_source:
         summary_status = "degraded"
+    elif latest_lifecycle_event == "playback_completed":
+        summary_status = "idle"
+    elif latest_lifecycle_event == "playback_queued" or active_playback_status == "prepared":
+        summary_status = "queued"
     elif active_playback_status == "prepared":
         summary_status = "queued"
     else:
@@ -45,15 +89,19 @@ def build_audio_summary_from_latest_audio_playback(
     return {
         "summary_status": summary_status,
         "active_playback_status": active_playback_status,
-        "active_playback_kind": extra.get("playback_kind"),
-        "active_output_type": extra.get("output_type"),
+        "active_playback_kind": latest_audio_event_extra.get("playback_kind") or extra.get("playback_kind"),
+        "active_output_type": latest_audio_event_extra.get("output_type") or extra.get("output_type"),
         "queued_count": 1 if metadata.get("lifecycle_action") == "queued" else 0,
         "latest_lifecycle_action": metadata.get("lifecycle_action"),
+        "latest_lifecycle_event": latest_lifecycle_event,
         "latest_completion_source": latest_completion_source,
         "latest_failure_source": latest_failure_source,
         "latest_failure_status": latest_failure_status,
         "latest_failure_message": latest_failure_message,
-        "latest_handle_status": metadata.get("latest_playback_handle_status"),
+        "latest_handle_status": latest_audio_event_extra.get("latest_playback_handle_status")
+        or completion_extra.get("latest_playback_handle_status")
+        or failure_extra.get("latest_playback_handle_status")
+        or metadata.get("latest_playback_handle_status"),
         "degraded_continuation_applied": degraded_continuation_applied,
         "degraded_continuation_policy": failure_extra.get("degraded_continuation_policy"),
     }
@@ -69,6 +117,7 @@ class JsonlSessionStore(SessionStore):
         self._latest_narration_text: Optional[str] = None
         self._latest_answer_text: Optional[str] = None
         self._latest_audio_playback: Optional[Dict[str, Any]] = None
+        self._recent_audio_events: List[Dict[str, Any]] = []
         self._closed = True
 
     @property
@@ -81,6 +130,21 @@ class JsonlSessionStore(SessionStore):
             raise RuntimeError("Session has not been started.")
         return self._output_path
 
+    @property
+    def latest_state(self) -> Optional[str]:
+        if self._latest_event is None:
+            return None
+        return self._latest_event.get("state")
+
+    @property
+    def latest_pose(self) -> Optional[Pose2D]:
+        if self._latest_event is None:
+            return None
+        pose = self._latest_event.get("pose")
+        if not pose:
+            return None
+        return Pose2D(x=float(pose["x"]), y=float(pose["y"]), label=pose.get("label"))
+
     def start_session(self, metadata: Optional[Dict[str, Any]] = None) -> str:
         self._session_log_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -91,6 +155,7 @@ class JsonlSessionStore(SessionStore):
         self._latest_narration_text = None
         self._latest_answer_text = None
         self._latest_audio_playback = None
+        self._recent_audio_events = []
         self._closed = False
         self.append_event("session_started", state="IDLE", extra=metadata or {})
         return self._session_id
@@ -138,6 +203,19 @@ class JsonlSessionStore(SessionStore):
                 "text": payload.get("narration_text"),
                 "extra": payload.get("extra") or {},
             }
+        if event_type in {"playback_started", "playback_interrupted", "playback_completed", "playback_failed"}:
+            self._recent_audio_events.append(
+                {
+                    "event_type": event_type,
+                    "state": payload.get("state"),
+                    "timestamp": payload.get("timestamp"),
+                    "spot_id": payload.get("spot_id"),
+                    "spot_name": payload.get("spot_name"),
+                    "text": payload.get("narration_text"),
+                    "extra": payload.get("extra") or {},
+                }
+            )
+            self._recent_audio_events = self._recent_audio_events[-5:]
 
     def close(self) -> None:
         if self._output_path is None or self._closed:
@@ -148,7 +226,20 @@ class JsonlSessionStore(SessionStore):
 
     def get_current_session_summary(self) -> Dict[str, Any]:
         latest = self._latest_event or {}
-        audio_summary = build_audio_summary_from_latest_audio_playback(self._latest_audio_playback)
+        completion_event = next(
+            (item for item in reversed(self._recent_audio_events) if item.get("event_type") == "playback_completed"),
+            None,
+        )
+        failure_event = next(
+            (item for item in reversed(self._recent_audio_events) if item.get("event_type") == "playback_failed"),
+            None,
+        )
+        audio_summary = build_audio_summary_from_latest_audio_playback(
+            self._latest_audio_playback,
+            completion_event=completion_event,
+            failure_event=failure_event,
+            recent_audio_events=self._recent_audio_events,
+        )
         return {
             "session_id": self._session_id,
             "session_log_path": None if self._output_path is None else str(self._output_path),
@@ -162,6 +253,7 @@ class JsonlSessionStore(SessionStore):
             "latest_answer_text": self._latest_answer_text,
             "latest_audio_playback": self._latest_audio_playback,
             "audio_summary": audio_summary,
+            "recent_audio_events": list(self._recent_audio_events),
         }
 
     def get_latest_session_summary(self) -> Dict[str, Any]:
@@ -197,6 +289,8 @@ class JsonlSessionStore(SessionStore):
                 "latest_narration_text": None,
                 "latest_answer_text": None,
                 "latest_audio_playback": None,
+                "audio_summary": build_audio_summary_from_latest_audio_playback(None),
+                "recent_audio_events": [],
             }
 
         latest_path = files[-1]
@@ -226,11 +320,6 @@ class JsonlSessionStore(SessionStore):
             ),
             None,
         )
-        audio_summary = build_audio_summary_from_latest_audio_playback(
-            latest_audio_playback=latest_audio_playback,
-            completion_event=_latest_event_by_type(events, "playback_completed"),
-            failure_event=_latest_event_by_type(events, "playback_failed"),
-        )
         return {
             "session_id": latest.get("session_id"),
             "session_log_path": str(latest_path),
@@ -243,5 +332,40 @@ class JsonlSessionStore(SessionStore):
             "latest_narration_text": latest_narration,
             "latest_answer_text": latest_answer,
             "latest_audio_playback": latest_audio_playback,
-            "audio_summary": audio_summary,
+            "audio_summary": build_audio_summary_from_latest_audio_playback(
+                latest_audio_playback=latest_audio_playback,
+                completion_event=_latest_event_by_type(events, "playback_completed"),
+                failure_event=_latest_event_by_type(events, "playback_failed"),
+                recent_audio_events=_build_recent_audio_events(events),
+            ),
+            "recent_audio_events": _build_recent_audio_events(events),
         }
+
+
+def build_audio_lifecycle_session_persister(
+    session_store: JsonlSessionStore,
+    route_pois: List[POI],
+) -> Callable[[Dict[str, Any]], None]:
+    poi_by_id = {poi.spot_id: poi for poi in route_pois}
+    persisted_event_types = {"playback_started", "playback_interrupted", "playback_completed", "playback_failed"}
+
+    def _persist(event: Dict[str, Any]) -> None:
+        event_type = event.get("event_type")
+        if event_type not in persisted_event_types:
+            return
+        session_store.append_event(
+            event_type=str(event_type),
+            pose=session_store.latest_pose,
+            poi=poi_by_id.get(str(event.get("spot_id"))) if event.get("spot_id") is not None else None,
+            state=session_store.latest_state,
+            narration_text=event.get("text"),
+            extra={
+                "playback_id": event.get("playback_id"),
+                "playback_kind": event.get("playback_kind"),
+                "output_type": event.get("output_type"),
+                "metadata": dict(event.get("metadata") or {}),
+                **dict(event.get("extra") or {}),
+            },
+        )
+
+    return _persist

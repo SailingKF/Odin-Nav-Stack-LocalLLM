@@ -128,6 +128,12 @@ Operator-facing concise summary surfaces now also exist in:
 - session summary `audio_summary`
 - `/debug` Audio Summary panel
 
+Historical session persistence now also keeps a compact:
+
+- `recent_audio_events`
+
+surface built only from key lifecycle outcomes.
+
 Current state shape includes:
 
 - `policy_name`
@@ -178,6 +184,21 @@ Lifecycle events now include:
 - `playback_queued`
 - `playback_interrupted`
 - `playback_completed`
+- `playback_failed`
+
+Only a compact subset is persisted into session logs for historical diagnosis:
+
+- `playback_started`
+- `playback_interrupted`
+- `playback_completed`
+- `playback_failed`
+
+This avoids writing the full raw playback state on every refresh while still preserving:
+
+- completion source
+- failure source and failure status
+- degraded continuation policy
+- queue advancement when it matters
 
 `playback_completed` now distinguishes:
 
@@ -196,3 +217,12 @@ Lifecycle events now include:
 - synchronization between real engine completion and the backend polling contract
 - richer failure classification and retry rules for real playback engines
 - queue persistence and recovery rules
+
+For post-run inspection, prefer:
+
+- session `audio_summary`
+- session `recent_audio_events`
+
+For live deep inspection, still use:
+
+- `audio_playback_state`

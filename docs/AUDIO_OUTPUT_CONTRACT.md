@@ -70,6 +70,13 @@ Playback requests are recorded as:
 
 - `audio_playback_requested` session events
 
+Key playback lifecycle outcomes are now also persisted as compact session events:
+
+- `playback_started`
+- `playback_interrupted`
+- `playback_completed`
+- `playback_failed`
+
 Text state is still preserved separately:
 
 - `last_narration_text`
@@ -81,6 +88,20 @@ Playback activity is exposed in runtime state and session summary through:
 - `audio_playback_state`
 - `last_audio_playback`
 - `latest_audio_playback`
+- `audio_summary`
+- `recent_audio_events`
+
+Historical persistence is intentionally compact:
+
+- key lifecycle outcomes are written into the session log
+- recent historical audio diagnosis is available through `recent_audio_events`
+- concise latest-outcome interpretation is available through `audio_summary`
+
+For deep live debugging, operators should still inspect:
+
+- `audio_playback_state`
+
+That raw surface remains the place for queue internals, active playback detail, and full recent lifecycle traces while the runtime is still alive.
 
 ## Relation To Future TTS
 

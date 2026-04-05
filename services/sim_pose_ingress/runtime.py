@@ -9,7 +9,7 @@ from core.interfaces.pose_provider import Pose2D
 from core.narrator.factory import build_narrator
 from core.poi.loader import load_pois, load_route
 from core.poi.store import InMemoryPoiStore
-from core.session.logger import JsonlSessionStore
+from core.session.logger import JsonlSessionStore, build_audio_lifecycle_session_persister
 from core.tour_orchestrator.orchestrator import TourOrchestrator
 
 
@@ -49,7 +49,12 @@ class SimPoseIngressRuntime:
         pose_provider = ExternalPoseProvider()
         session_store = JsonlSessionStore(str(self._session_log_dir))
         narrator = build_narrator(self._config)
-        audio_output = build_audio_output(self._config, event_callback=print, repo_root=self._repo_root)
+        audio_output = build_audio_output(
+            self._config,
+            event_callback=print,
+            repo_root=self._repo_root,
+            lifecycle_event_callback=build_audio_lifecycle_session_persister(session_store, route_pois),
+        )
 
         self._pose_provider = pose_provider
         return TourOrchestrator(
