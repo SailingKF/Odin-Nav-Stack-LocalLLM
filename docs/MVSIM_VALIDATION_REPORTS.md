@@ -50,10 +50,45 @@ Each report currently includes at least:
 - `live_second_narration_occurred`
 - `recent_triggered_spot_ids`
 - `recent_narrated_spot_ids`
+- `validation_asset_identity`
 - `mvsim_source_kind`
 - `proxy_target`
 - `service_targets`
 - `detail` when useful
+
+## Validation Asset Identity
+
+Each report now includes a compact `validation_asset_identity` block. The goal is not to mirror the whole config. The goal is to capture only the small set of fields needed to decide whether a live run and a compatibility run came from meaningfully comparable validation assets.
+
+Current identity fields are:
+
+- `identity_version`
+- `validation_mode`
+- `mvsim_mode`
+- `config_name`
+- `config_path`
+- `route_file`
+- `poi_file`
+- `world_file`
+- `vehicle_name`
+- `alignment_strategy`
+- `motion_strategy`
+- `target_spot_id`
+- `second_target_spot_id`
+
+Comparison-critical fields are intentionally narrow:
+
+- `route_file`
+- `poi_file`
+- `world_file`
+- `vehicle_name`
+- `alignment_strategy`
+- `motion_strategy`
+
+Context-only warning fields are:
+
+- `config_name`
+- `config_path`
 
 ## Truthfulness Rules
 
@@ -104,7 +139,7 @@ Current compared fields include:
 - recent triggered spots
 - recent narrated spots
 - latest spot name
-- config name when useful through the compact report views
+- compact validation asset identity
 
 Missing-report cases are explicit:
 
@@ -112,6 +147,26 @@ Missing-report cases are explicit:
 - `missing_modes: ["live_runtime"]`
 - `missing_modes: ["compatibility_shim"]`
 - or both if neither report exists yet
+
+The comparison now also includes explicit guardrails:
+
+- `comparability_status`
+  - `comparable`
+  - `comparable_with_warnings`
+  - `not_directly_comparable`
+- `guardrail_reasons`
+- `identity_guardrails`
+
+Guardrail behavior is:
+
+- `comparable`
+  - required validation assets match
+- `comparable_with_warnings`
+  - required assets still match, but some identity fields are incomplete or only config-context fields differ
+- `not_directly_comparable`
+  - one or more required validation assets differ, or one side is missing the identity block entirely
+
+This keeps the harness from silently implying that two latest reports are fair to compare when they were produced with different validation assets.
 
 ## Scope Limits
 

@@ -24,23 +24,49 @@ class _FakeHarnessRuntime:
             "status": "passed",
             "validation_mode": "live_runtime",
             "route_completed": True,
+            "validation_asset_identity": {
+                "config_name": "sim_harness.yaml",
+                "world_file": "content/sim/mvsim/worlds/odin_live_multistop_tour.world.xml",
+                "vehicle_name": "tour_bot",
+                "route_file": "content/routes/demo_route.yaml",
+                "poi_file": "content/poi/demo_pois.yaml",
+                "alignment_strategy": "isolated_live_validation_world_with_forward_motion",
+                "motion_strategy": "constant_forward_velocity_along_demo_axis",
+            },
             "report_path": "session_logs/mvsim_validation_harness/reports/20260406T120000Z-live_runtime.json",
         }
         self._comparison = {
             "status": "ready",
             "comparison_available": True,
             "missing_modes": [],
+            "comparability_status": "comparable",
+            "guardrail_reasons": ["required validation assets match across the latest live and compatibility reports"],
             "live_runtime_report": {
                 "report_id": "20260406T120000Z-live_runtime",
                 "validation_mode": "live_runtime",
                 "passed": True,
                 "route_completed": True,
+                "validation_asset_identity": {
+                    "world_file": "content/sim/mvsim/worlds/odin_live_multistop_tour.world.xml",
+                    "vehicle_name": "tour_bot",
+                },
             },
             "compatibility_shim_report": {
                 "report_id": "20260406T120100Z-compatibility_shim",
                 "validation_mode": "compatibility_shim",
                 "passed": True,
                 "route_completed": True,
+                "validation_asset_identity": {
+                    "world_file": "content/sim/mvsim/worlds/odin_live_multistop_tour.world.xml",
+                    "vehicle_name": "tour_bot",
+                },
+            },
+            "identity_guardrails": {
+                "comparability_status": "comparable",
+                "guardrail_reasons": ["required validation assets match across the latest live and compatibility reports"],
+                "critical_mismatches": [],
+                "warnings": [],
+                "checked_identity_fields": [],
             },
             "differences": {
                 "triggered_spots_equal": True,
@@ -327,6 +353,7 @@ class MVSimValidationHarnessTests(unittest.TestCase):
         self.assertIn("Live Vs Compatibility", page.text)
         self.assertIn("Latest Report", page.text)
         self.assertIn("Recent Runs", page.text)
+        self.assertIn("Comparability", page.text)
         self.assertEqual(status.status_code, 200)
         self.assertEqual(status.json()["service"], "mvsim-validation-harness")
         self.assertTrue(start.json()["ok"])
@@ -337,6 +364,7 @@ class MVSimValidationHarnessTests(unittest.TestCase):
         self.assertEqual(latest_report.json()["latest_report"]["report_id"], "20260406T120000Z-live_runtime")
         self.assertEqual(recent_reports.json()["recent_reports"][0]["validation_mode"], "live_runtime")
         self.assertEqual(comparison.json()["latest_comparison"]["status"], "ready")
+        self.assertEqual(comparison.json()["latest_comparison"]["comparability_status"], "comparable")
 
     def test_harness_can_run_compatibility_mode_request(self) -> None:
         client = TestClient(create_app(runtime=_FakeHarnessRuntime()))

@@ -1144,6 +1144,27 @@ How to inspect the latest comparison:
 curl http://127.0.0.1:8301/reports/compare
 ```
 
+Round 040 validation-asset identity guardrails:
+- each persisted harness report now includes a compact `validation_asset_identity` block
+- latest live-vs-compatibility comparison now reports:
+  - `comparability_status`
+  - `guardrail_reasons`
+  - compact asset identity for both reports
+- the harness now distinguishes:
+  - `comparable`
+  - `comparable_with_warnings`
+  - `not_directly_comparable`
+
+Current fields used for direct comparability are:
+- `route_file`
+- `poi_file`
+- `world_file`
+- `vehicle_name`
+- `alignment_strategy`
+- `motion_strategy`
+
+Config identity such as `config_name` / `config_path` stays visible, but is treated as operator context and warning-only metadata rather than a hard blocker by itself.
+
 Focused docs:
 - `docs/MVSIM_LIVE_RUNTIME_BRINGUP.md`
 - `docs/MVSIM_LIVE_POSE_BRIDGE.md`

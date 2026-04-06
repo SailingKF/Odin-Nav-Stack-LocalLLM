@@ -183,3 +183,38 @@ Current read surfaces:
 
 This means an operator can inspect the most recent validation result later without replaying the run.
 It also means the harness can now show a compact latest live-vs-compatibility sanity check without rerunning either path.
+
+## Comparison Guardrails
+
+The latest live-vs-compatibility comparison is now explicitly guarded by a compact validation-asset identity contract.
+
+The goal is narrow:
+
+- allow comparison when the two runs clearly used the same validation assets
+- warn when the identity is incomplete or only config-context fields differ
+- refuse to imply direct comparability when core validation assets differ
+
+Current guardrail statuses are:
+
+- `comparable`
+- `comparable_with_warnings`
+- `not_directly_comparable`
+
+The operator-facing comparison now exposes:
+
+- `comparability_status`
+- `guardrail_reasons`
+- compact validation asset identity for:
+  - latest live report
+  - latest compatibility report
+
+Current required asset fields for direct comparability are:
+
+- `route_file`
+- `poi_file`
+- `world_file`
+- `vehicle_name`
+- `alignment_strategy`
+- `motion_strategy`
+
+Config identity fields such as `config_name` and `config_path` are still shown, but they are treated as warning-only context rather than hard blockers.

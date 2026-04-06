@@ -92,6 +92,18 @@
     };
     function setFeedback(message, isError=false) { elements.feedback.textContent = message; elements.feedback.classList.toggle("error", Boolean(isError)); }
     function badge(text, kind) { const span=document.createElement("span"); span.className=`badge${kind==="fail"?" fail":kind==="warn"?" warn":""}`; span.textContent=text; return span; }
+    function formatIdentity(identity) {
+      if (!identity || typeof identity !== "object") return null;
+      const pairs = [
+        ["world", identity.world_file],
+        ["vehicle", identity.vehicle_name],
+        ["route", identity.route_file],
+        ["poi", identity.poi_file],
+        ["align", identity.alignment_strategy],
+        ["motion", identity.motion_strategy],
+      ].filter(([, value]) => value);
+      return pairs.length ? pairs.map(([key, value]) => `${key}=${value}`).join(" | ") : JSON.stringify(identity);
+    }
     function renderPanel(panel, items) {
       panel.innerHTML="";
       items.forEach(([key,value,badgeKind])=>{
@@ -174,9 +186,13 @@
       ]);
       renderPanel(elements.comparisonPanel, [
         ["Comparison Status", comparison.status || null, comparison.status==="ready" ? "ok" : comparison.status ? "warn" : null],
+        ["Comparability", comparison.comparability_status || null, comparison.comparability_status==="comparable" ? "ok" : comparison.comparability_status==="not_directly_comparable" ? "fail" : comparison.comparability_status ? "warn" : null],
         ["Missing Modes", Array.isArray(comparison.missing_modes) ? comparison.missing_modes.join(", ") : null],
+        ["Guardrail Reasons", Array.isArray(comparison.guardrail_reasons) ? comparison.guardrail_reasons.join(" | ") : null],
         ["Latest Live Report", comparison.live_runtime_report ? `${comparison.live_runtime_report.report_id} | passed=${comparison.live_runtime_report.passed ? "true" : "false"} | route_completed=${comparison.live_runtime_report.route_completed ? "true" : "false"}` : null, comparison.live_runtime_report ? "ok" : "warn"],
         ["Latest Compatibility Report", comparison.compatibility_shim_report ? `${comparison.compatibility_shim_report.report_id} | passed=${comparison.compatibility_shim_report.passed ? "true" : "false"} | route_completed=${comparison.compatibility_shim_report.route_completed ? "true" : "false"}` : null, comparison.compatibility_shim_report ? "ok" : "warn"],
+        ["Live Asset Identity", comparison.live_runtime_report ? formatIdentity(comparison.live_runtime_report.validation_asset_identity) : null],
+        ["Compatibility Asset Identity", comparison.compatibility_shim_report ? formatIdentity(comparison.compatibility_shim_report.validation_asset_identity) : null],
         ["Triggered Spots Equal", comparison.differences ? comparison.differences.triggered_spots_equal : null, comparison.differences && comparison.differences.triggered_spots_equal ? "ok" : comparison.comparison_available ? "warn" : null],
         ["Narrated Spots Equal", comparison.differences ? comparison.differences.narrated_spots_equal : null, comparison.differences && comparison.differences.narrated_spots_equal ? "ok" : comparison.comparison_available ? "warn" : null],
         ["Latest Spot Equal", comparison.differences ? comparison.differences.latest_spot_name_equal : null, comparison.differences && comparison.differences.latest_spot_name_equal ? "ok" : comparison.comparison_available ? "warn" : null],
@@ -192,6 +208,7 @@
         ["Route Completed", latestReport.route_completed, latestReport.route_completed ? "ok" : "warn"],
         ["Triggered Spots", Array.isArray(latestReport.recent_triggered_spot_ids) ? latestReport.recent_triggered_spot_ids.join(", ") : null],
         ["Narrated Spots", Array.isArray(latestReport.recent_narrated_spot_ids) ? latestReport.recent_narrated_spot_ids.join(", ") : null],
+        ["Validation Asset Identity", formatIdentity(latestReport.validation_asset_identity)],
         ["Report Path", latestReport.report_path || null],
       ]);
       renderPanel(elements.recentReportsPanel, (recentReports || []).slice(0,5).map(item => [

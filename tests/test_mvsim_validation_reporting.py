@@ -46,6 +46,18 @@ class MVSimValidationReportingTests(unittest.TestCase):
                 },
             },
             config_path=Path("configs/sim_harness.yaml"),
+            config_payload={
+                "current_route_file": "content/routes/demo_route.yaml",
+                "current_poi_file": "content/poi/demo_pois.yaml",
+                "mvsim_integration": {
+                    "world_file": "content/sim/mvsim/worlds/odin_live_multistop_tour.world.xml",
+                    "vehicle_name": "tour_bot",
+                    "live_validation_alignment": {
+                        "strategy": "isolated_live_validation_world_with_forward_motion",
+                        "motion_strategy": "constant_forward_velocity_along_demo_axis",
+                    },
+                },
+            },
             harness_url="http://127.0.0.1:8301",
             debug_url="http://127.0.0.1:8001/debug",
         )
@@ -57,6 +69,14 @@ class MVSimValidationReportingTests(unittest.TestCase):
         self.assertTrue(report["route_completed"])
         self.assertEqual(report["recent_triggered_spot_ids"], ["gate", "plaza", "gallery"])
         self.assertEqual(report["service_targets"]["api_server"], "http://127.0.0.1:8001/health")
+        self.assertEqual(
+            report["validation_asset_identity"]["world_file"],
+            "content/sim/mvsim/worlds/odin_live_multistop_tour.world.xml",
+        )
+        self.assertEqual(
+            report["validation_asset_identity"]["motion_strategy"],
+            "constant_forward_velocity_along_demo_axis",
+        )
 
     def test_report_store_persists_latest_and_recent(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -95,6 +115,16 @@ class MVSimValidationReportingTests(unittest.TestCase):
                 "recent_triggered_spot_ids": ["gate", "plaza", "gallery"],
                 "recent_narrated_spot_ids": ["gate", "plaza", "gallery"],
                 "latest_spot_name": "History Gallery",
+                "validation_asset_identity": {
+                    "config_name": "sim_harness.yaml",
+                    "config_path": "configs/sim_harness.yaml",
+                    "route_file": "content/routes/demo_route.yaml",
+                    "poi_file": "content/poi/demo_pois.yaml",
+                    "world_file": "content/sim/mvsim/worlds/odin_live_multistop_tour.world.xml",
+                    "vehicle_name": "tour_bot",
+                    "alignment_strategy": "isolated_live_validation_world_with_forward_motion",
+                    "motion_strategy": "constant_forward_velocity_along_demo_axis",
+                },
             },
             latest_compatibility_report={
                 "report_id": "compat-1",
@@ -104,12 +134,23 @@ class MVSimValidationReportingTests(unittest.TestCase):
                 "recent_triggered_spot_ids": ["gate", "plaza", "gallery"],
                 "recent_narrated_spot_ids": ["gate", "plaza", "gallery"],
                 "latest_spot_name": "History Gallery",
+                "validation_asset_identity": {
+                    "config_name": "sim_harness.yaml",
+                    "config_path": "configs/sim_harness.yaml",
+                    "route_file": "content/routes/demo_route.yaml",
+                    "poi_file": "content/poi/demo_pois.yaml",
+                    "world_file": "content/sim/mvsim/worlds/odin_live_multistop_tour.world.xml",
+                    "vehicle_name": "tour_bot",
+                    "alignment_strategy": "isolated_live_validation_world_with_forward_motion",
+                    "motion_strategy": "constant_forward_velocity_along_demo_axis",
+                },
             },
         )
 
         self.assertEqual(summary["status"], "ready")
         self.assertTrue(summary["comparison_available"])
         self.assertEqual(summary["missing_modes"], [])
+        self.assertEqual(summary["comparability_status"], "comparable")
         self.assertTrue(summary["differences"]["triggered_spots_equal"])
         self.assertTrue(summary["differences"]["narrated_spots_equal"])
         self.assertTrue(summary["differences"]["latest_spot_name_equal"])
@@ -123,6 +164,71 @@ class MVSimValidationReportingTests(unittest.TestCase):
         self.assertEqual(summary["status"], "missing_reports")
         self.assertFalse(summary["comparison_available"])
         self.assertEqual(summary["missing_modes"], ["live_runtime"])
+
+    def test_build_latest_mode_comparison_marks_mismatched_assets_not_directly_comparable(self) -> None:
+        summary = build_latest_mode_comparison(
+            latest_live_report={
+                "report_id": "live-1",
+                "validation_mode": "live_runtime",
+                "validation_asset_identity": {
+                    "route_file": "content/routes/demo_route.yaml",
+                    "poi_file": "content/poi/demo_pois.yaml",
+                    "world_file": "content/sim/mvsim/worlds/odin_live_multistop_tour.world.xml",
+                    "vehicle_name": "tour_bot",
+                    "alignment_strategy": "isolated_live_validation_world_with_forward_motion",
+                    "motion_strategy": "constant_forward_velocity_along_demo_axis",
+                },
+            },
+            latest_compatibility_report={
+                "report_id": "compat-1",
+                "validation_mode": "compatibility_shim",
+                "validation_asset_identity": {
+                    "route_file": "content/routes/demo_route.yaml",
+                    "poi_file": "content/poi/demo_pois.yaml",
+                    "world_file": "content/sim/mvsim/worlds/other_world.world.xml",
+                    "vehicle_name": "tour_bot",
+                    "alignment_strategy": "isolated_live_validation_world_with_forward_motion",
+                    "motion_strategy": "constant_forward_velocity_along_demo_axis",
+                },
+            },
+        )
+
+        self.assertEqual(summary["comparability_status"], "not_directly_comparable")
+        self.assertIn("world_file", summary["identity_guardrails"]["critical_mismatches"])
+
+    def test_build_latest_mode_comparison_marks_missing_identity_as_warning(self) -> None:
+        summary = build_latest_mode_comparison(
+            latest_live_report={
+                "report_id": "live-1",
+                "validation_mode": "live_runtime",
+                "validation_asset_identity": {
+                    "route_file": "content/routes/demo_route.yaml",
+                    "poi_file": "content/poi/demo_pois.yaml",
+                    "world_file": "content/sim/mvsim/worlds/odin_live_multistop_tour.world.xml",
+                    "vehicle_name": "tour_bot",
+                    "alignment_strategy": "isolated_live_validation_world_with_forward_motion",
+                    "motion_strategy": None,
+                    "config_name": "sim_harness.yaml",
+                },
+            },
+            latest_compatibility_report={
+                "report_id": "compat-1",
+                "validation_mode": "compatibility_shim",
+                "validation_asset_identity": {
+                    "route_file": "content/routes/demo_route.yaml",
+                    "poi_file": "content/poi/demo_pois.yaml",
+                    "world_file": "content/sim/mvsim/worlds/odin_live_multistop_tour.world.xml",
+                    "vehicle_name": "tour_bot",
+                    "alignment_strategy": "isolated_live_validation_world_with_forward_motion",
+                    "motion_strategy": "constant_forward_velocity_along_demo_axis",
+                    "config_name": "sim_harness_alt.yaml",
+                },
+            },
+        )
+
+        self.assertEqual(summary["comparability_status"], "comparable_with_warnings")
+        self.assertIn("motion_strategy", summary["identity_guardrails"]["warnings"])
+        self.assertIn("config_name", summary["identity_guardrails"]["warnings"])
 
 
 if __name__ == "__main__":

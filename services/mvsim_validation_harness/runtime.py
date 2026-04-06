@@ -265,9 +265,13 @@ class MVSimValidationHarnessRuntime:
         )
 
     def _persist_validation_report(self, validation_result: Dict[str, Any], service_specs: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        active_config = self._config_for_validation_mode(
+            str(validation_result.get("validation_mode") or self._selected_validation_mode)
+        )
         report = build_validation_report(
             validation_result=validation_result,
             config_path=self._config_path,
+            config_payload=active_config,
             harness_url=self._harness_url,
             debug_url=self._debug_url(service_specs),
         )

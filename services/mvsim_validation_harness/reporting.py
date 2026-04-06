@@ -4,12 +4,156 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
+IDENTITY_VERSION = "validation_asset_identity.v1"
+_REQUIRED_IDENTITY_FIELDS = (
+    "route_file",
+    "poi_file",
+    "world_file",
+    "vehicle_name",
+    "alignment_strategy",
+    "motion_strategy",
+)
+_WARNING_IDENTITY_FIELDS = (
+    "config_name",
+    "config_path",
+)
+
+
 def _utc_timestamp_slug() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
 def _json_copy(payload: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     return json.loads(json.dumps(payload or {}))
+
+
+def _string_or_none(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _compact_identity_view(identity: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not identity:
+        return None
+    return {
+        "identity_version": identity.get("identity_version"),
+        "validation_mode": identity.get("validation_mode"),
+        "config_name": identity.get("config_name"),
+        "world_file": identity.get("world_file"),
+        "vehicle_name": identity.get("vehicle_name"),
+        "route_file": identity.get("route_file"),
+        "poi_file": identity.get("poi_file"),
+        "alignment_strategy": identity.get("alignment_strategy"),
+        "motion_strategy": identity.get("motion_strategy"),
+    }
+
+
+def _build_validation_asset_identity(
+    validation_result: Dict[str, Any],
+    config_path: Path,
+    config_payload: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    config = _json_copy(config_payload)
+    mvsim_integration = dict(config.get("mvsim_integration") or {})
+    live_alignment = dict(mvsim_integration.get("live_validation_alignment") or {})
+    return {
+        "identity_version": IDENTITY_VERSION,
+        "validation_mode": _string_or_none(validation_result.get("validation_mode")),
+        "mvsim_mode": _string_or_none(validation_result.get("mvsim_mode")),
+        "config_name": config_path.name,
+        "config_path": str(config_path),
+        "route_file": _string_or_none(config.get("current_route_file")),
+        "poi_file": _string_or_none(config.get("current_poi_file")),
+        "world_file": _string_or_none(mvsim_integration.get("world_file")),
+        "vehicle_name": _string_or_none(mvsim_integration.get("vehicle_name")),
+        "alignment_strategy": _string_or_none(live_alignment.get("strategy")),
+        "motion_strategy": _string_or_none(live_alignment.get("motion_strategy")),
+        "target_spot_id": _string_or_none(live_alignment.get("target_spot_id")),
+        "second_target_spot_id": _string_or_none(live_alignment.get("second_target_spot_id")),
+    }
+
+
+def _compare_validation_asset_identity(
+    live_identity: Optional[Dict[str, Any]],
+    compatibility_identity: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    if not live_identity or not compatibility_identity:
+        reasons = []
+        if not live_identity:
+            reasons.append("live_runtime report is missing validation_asset_identity")
+        if not compatibility_identity:
+            reasons.append("compatibility_shim report is missing validation_asset_identity")
+        return {
+            "comparability_status": "not_directly_comparable",
+            "guardrail_reasons": reasons,
+            "critical_mismatches": ["validation_asset_identity_missing"],
+            "warnings": [],
+            "checked_identity_fields": [],
+        }
+
+    checked_fields: List[Dict[str, Any]] = []
+    critical_mismatches: List[str] = []
+    warnings: List[str] = []
+    guardrail_reasons: List[str] = []
+
+    for field_name in _REQUIRED_IDENTITY_FIELDS + _WARNING_IDENTITY_FIELDS:
+        live_value = _string_or_none(live_identity.get(field_name))
+        compatibility_value = _string_or_none(compatibility_identity.get(field_name))
+        if live_value and compatibility_value:
+            result = "match" if live_value == compatibility_value else "mismatch"
+        elif live_value or compatibility_value:
+            result = "missing_on_one_side"
+        else:
+            result = "missing_on_both_sides"
+
+        checked_fields.append(
+            {
+                "field": field_name,
+                "live_runtime": live_value,
+                "compatibility_shim": compatibility_value,
+                "result": result,
+            }
+        )
+
+        if field_name in _REQUIRED_IDENTITY_FIELDS:
+            if result == "mismatch":
+                critical_mismatches.append(field_name)
+                guardrail_reasons.append(
+                    f"{field_name} differs: live_runtime='{live_value}' vs compatibility_shim='{compatibility_value}'"
+                )
+            elif result in {"missing_on_one_side", "missing_on_both_sides"}:
+                warnings.append(field_name)
+                guardrail_reasons.append(
+                    f"{field_name} is incomplete across the two reports"
+                )
+        elif result == "mismatch":
+            warnings.append(field_name)
+            guardrail_reasons.append(
+                f"{field_name} differs but does not block direct asset comparison"
+            )
+        elif result in {"missing_on_one_side", "missing_on_both_sides"}:
+            warnings.append(field_name)
+            guardrail_reasons.append(
+                f"{field_name} is missing in at least one report"
+            )
+
+    if critical_mismatches:
+        comparability_status = "not_directly_comparable"
+    elif warnings:
+        comparability_status = "comparable_with_warnings"
+    else:
+        comparability_status = "comparable"
+        guardrail_reasons.append("required validation assets match across the latest live and compatibility reports")
+
+    return {
+        "comparability_status": comparability_status,
+        "guardrail_reasons": guardrail_reasons,
+        "critical_mismatches": critical_mismatches,
+        "warnings": warnings,
+        "checked_identity_fields": checked_fields,
+    }
 
 
 def _compact_report_view(report: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -30,6 +174,7 @@ def _compact_report_view(report: Optional[Dict[str, Any]]) -> Optional[Dict[str,
         "latest_narration_text": report.get("latest_narration_text"),
         "recent_triggered_spot_ids": list(report.get("recent_triggered_spot_ids") or []),
         "recent_narrated_spot_ids": list(report.get("recent_narrated_spot_ids") or []),
+        "validation_asset_identity": _compact_identity_view(report.get("validation_asset_identity")),
         "report_path": report.get("report_path"),
     }
 
@@ -48,7 +193,18 @@ def build_latest_mode_comparison(
     status = "ready" if comparison_available else "missing_reports"
 
     differences: Dict[str, Any] = {}
+    identity_guardrails: Dict[str, Any] = {
+        "comparability_status": "not_directly_comparable" if comparison_available else "unknown",
+        "guardrail_reasons": [] if comparison_available else ["cannot compare reports until both validation modes exist"],
+        "critical_mismatches": [],
+        "warnings": [],
+        "checked_identity_fields": [],
+    }
     if comparison_available:
+        identity_guardrails = _compare_validation_asset_identity(
+            latest_live_report.get("validation_asset_identity"),
+            latest_compatibility_report.get("validation_asset_identity"),
+        )
         differences = {
             "passed_equal": bool(latest_live_report.get("passed")) == bool(latest_compatibility_report.get("passed")),
             "route_completed_equal": bool(latest_live_report.get("route_completed")) == bool(latest_compatibility_report.get("route_completed")),
@@ -71,6 +227,9 @@ def build_latest_mode_comparison(
         "missing_modes": missing_modes,
         "live_runtime_report": _compact_report_view(latest_live_report),
         "compatibility_shim_report": _compact_report_view(latest_compatibility_report),
+        "comparability_status": identity_guardrails.get("comparability_status"),
+        "guardrail_reasons": list(identity_guardrails.get("guardrail_reasons") or []),
+        "identity_guardrails": identity_guardrails,
         "differences": differences,
     }
 
@@ -79,6 +238,7 @@ def build_validation_report(
     *,
     validation_result: Dict[str, Any],
     config_path: Path,
+    config_payload: Optional[Dict[str, Any]] = None,
     harness_url: str,
     debug_url: str,
 ) -> Dict[str, Any]:
@@ -106,6 +266,11 @@ def build_validation_report(
         ]
 
     report_id = f"{_utc_timestamp_slug()}-{validation_result.get('validation_mode', 'unknown')}"
+    validation_asset_identity = _build_validation_asset_identity(
+        validation_result=validation_result,
+        config_path=config_path,
+        config_payload=config_payload,
+    )
     return {
         "report_id": report_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -126,6 +291,7 @@ def build_validation_report(
         "live_second_narration_occurred": bool(live_summary.get("live_second_narration_occurred")),
         "recent_triggered_spot_ids": recent_triggered_spot_ids,
         "recent_narrated_spot_ids": recent_narrated_spot_ids,
+        "validation_asset_identity": validation_asset_identity,
         "mvsim_source_kind": mvsim_source.get("source_kind"),
         "proxy_target": api_session.get("proxy_target") or validation_result.get("api_state", {}).get("proxy_target"),
         "service_targets": {
