@@ -76,13 +76,42 @@ The harness now exposes report data through:
 
 - `GET /reports/latest`
 - `GET /reports/recent`
+- `GET /reports/compare`
 
 The harness status surface also includes:
 
 - `latest_report`
 - `recent_reports`
+- `latest_comparison`
 
 This lets an operator inspect the last run without replaying the session.
+
+## Latest Live Vs Compatibility Comparison
+
+The harness now also exposes a compact comparison between:
+
+- the latest available `live_runtime` report
+- the latest available `compatibility_shim` report
+
+The comparison stays intentionally small.
+
+Current compared fields include:
+
+- pass/fail
+- route completion
+- first live POI hit truth
+- second live POI hit truth
+- recent triggered spots
+- recent narrated spots
+- latest spot name
+- config name when useful through the compact report views
+
+Missing-report cases are explicit:
+
+- `status: "missing_reports"`
+- `missing_modes: ["live_runtime"]`
+- `missing_modes: ["compatibility_shim"]`
+- or both if neither report exists yet
 
 ## Scope Limits
 

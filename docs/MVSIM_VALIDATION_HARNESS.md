@@ -175,8 +175,11 @@ Current read surfaces:
 
 - `GET /reports/latest`
 - `GET /reports/recent`
+- `GET /reports/compare`
 - harness status also includes:
   - `latest_report`
   - `recent_reports`
+  - `latest_comparison`
 
 This means an operator can inspect the most recent validation result later without replaying the run.
+It also means the harness can now show a compact latest live-vs-compatibility sanity check without rerunning either path.

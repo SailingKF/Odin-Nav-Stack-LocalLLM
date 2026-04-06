@@ -12,6 +12,69 @@ def _json_copy(payload: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     return json.loads(json.dumps(payload or {}))
 
 
+def _compact_report_view(report: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not report:
+        return None
+    return {
+        "report_id": report.get("report_id"),
+        "created_at": report.get("created_at"),
+        "status": report.get("status"),
+        "passed": report.get("passed"),
+        "validation_mode": report.get("validation_mode"),
+        "config_name": report.get("config_name"),
+        "route_completed": report.get("route_completed"),
+        "live_first_poi_hit_occurred": report.get("live_first_poi_hit_occurred"),
+        "live_second_poi_hit_occurred": report.get("live_second_poi_hit_occurred"),
+        "live_second_narration_occurred": report.get("live_second_narration_occurred"),
+        "latest_spot_name": report.get("latest_spot_name"),
+        "latest_narration_text": report.get("latest_narration_text"),
+        "recent_triggered_spot_ids": list(report.get("recent_triggered_spot_ids") or []),
+        "recent_narrated_spot_ids": list(report.get("recent_narrated_spot_ids") or []),
+        "report_path": report.get("report_path"),
+    }
+
+
+def build_latest_mode_comparison(
+    latest_live_report: Optional[Dict[str, Any]],
+    latest_compatibility_report: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    missing_modes: List[str] = []
+    if not latest_live_report:
+        missing_modes.append("live_runtime")
+    if not latest_compatibility_report:
+        missing_modes.append("compatibility_shim")
+
+    comparison_available = not missing_modes
+    status = "ready" if comparison_available else "missing_reports"
+
+    differences: Dict[str, Any] = {}
+    if comparison_available:
+        differences = {
+            "passed_equal": bool(latest_live_report.get("passed")) == bool(latest_compatibility_report.get("passed")),
+            "route_completed_equal": bool(latest_live_report.get("route_completed")) == bool(latest_compatibility_report.get("route_completed")),
+            "live_first_poi_hit_equal": bool(latest_live_report.get("live_first_poi_hit_occurred")) == bool(
+                latest_compatibility_report.get("live_first_poi_hit_occurred")
+            ),
+            "live_second_poi_hit_equal": bool(latest_live_report.get("live_second_poi_hit_occurred")) == bool(
+                latest_compatibility_report.get("live_second_poi_hit_occurred")
+            ),
+            "triggered_spots_equal": list(latest_live_report.get("recent_triggered_spot_ids") or [])
+            == list(latest_compatibility_report.get("recent_triggered_spot_ids") or []),
+            "narrated_spots_equal": list(latest_live_report.get("recent_narrated_spot_ids") or [])
+            == list(latest_compatibility_report.get("recent_narrated_spot_ids") or []),
+            "latest_spot_name_equal": latest_live_report.get("latest_spot_name") == latest_compatibility_report.get("latest_spot_name"),
+        }
+
+    return {
+        "status": status,
+        "comparison_available": comparison_available,
+        "missing_modes": missing_modes,
+        "live_runtime_report": _compact_report_view(latest_live_report),
+        "compatibility_shim_report": _compact_report_view(latest_compatibility_report),
+        "differences": differences,
+    }
+
+
 def build_validation_report(
     *,
     validation_result: Dict[str, Any],
@@ -106,3 +169,9 @@ class ValidationReportStore:
     def read_recent_reports(self, limit: int = 5) -> List[Dict[str, Any]]:
         files = sorted(self._root_dir.glob("*.json"), reverse=True)[:limit]
         return [self._load_report(path) for path in files]
+
+    def read_latest_report_for_mode(self, validation_mode: str) -> Optional[Dict[str, Any]]:
+        for report in self.read_recent_reports(limit=100):
+            if report.get("validation_mode") == validation_mode:
+                return report
+        return None

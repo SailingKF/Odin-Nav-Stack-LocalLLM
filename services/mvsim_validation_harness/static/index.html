@@ -72,6 +72,7 @@
       <section class="card"><h2>Overall Summary</h2><div id="summaryPanel" class="kv"></div></section>
       <section class="card"><h2>Service Checks</h2><div id="servicePanel" class="kv"></div></section>
       <section class="card"><h2>Validation Result</h2><div id="validationPanel" class="kv"></div></section>
+      <section class="card"><h2>Live Vs Compatibility</h2><div id="comparisonPanel" class="kv"></div></section>
       <section class="card"><h2>Latest Report</h2><div id="latestReportPanel" class="kv"></div></section>
       <section class="card"><h2>Recent Runs</h2><div id="recentReportsPanel" class="kv"></div></section>
     </div>
@@ -82,6 +83,7 @@
       summaryPanel: document.getElementById("summaryPanel"),
       servicePanel: document.getElementById("servicePanel"),
       validationPanel: document.getElementById("validationPanel"),
+      comparisonPanel: document.getElementById("comparisonPanel"),
       latestReportPanel: document.getElementById("latestReportPanel"),
       recentReportsPanel: document.getElementById("recentReportsPanel"),
       questionInput: document.getElementById("questionInput"),
@@ -113,6 +115,7 @@
       const validation = payload.last_validation_result || {};
       const latestReport = payload.latest_report || {};
       const recentReports = payload.recent_reports || [];
+      const comparison = payload.latest_comparison || {};
       const validationModes = payload.validation_modes || {};
       if (Array.isArray(validationModes.available) && validationModes.available.length) {
         elements.modeSelect.innerHTML = "";
@@ -168,6 +171,15 @@
         ["Session ID", validation.api_latest_session ? validation.api_latest_session.session_id : null],
         ["Question Result", validation.question_result ? validation.question_result.answer_text : null],
         ["Blocker", validation.detail || null],
+      ]);
+      renderPanel(elements.comparisonPanel, [
+        ["Comparison Status", comparison.status || null, comparison.status==="ready" ? "ok" : comparison.status ? "warn" : null],
+        ["Missing Modes", Array.isArray(comparison.missing_modes) ? comparison.missing_modes.join(", ") : null],
+        ["Latest Live Report", comparison.live_runtime_report ? `${comparison.live_runtime_report.report_id} | passed=${comparison.live_runtime_report.passed ? "true" : "false"} | route_completed=${comparison.live_runtime_report.route_completed ? "true" : "false"}` : null, comparison.live_runtime_report ? "ok" : "warn"],
+        ["Latest Compatibility Report", comparison.compatibility_shim_report ? `${comparison.compatibility_shim_report.report_id} | passed=${comparison.compatibility_shim_report.passed ? "true" : "false"} | route_completed=${comparison.compatibility_shim_report.route_completed ? "true" : "false"}` : null, comparison.compatibility_shim_report ? "ok" : "warn"],
+        ["Triggered Spots Equal", comparison.differences ? comparison.differences.triggered_spots_equal : null, comparison.differences && comparison.differences.triggered_spots_equal ? "ok" : comparison.comparison_available ? "warn" : null],
+        ["Narrated Spots Equal", comparison.differences ? comparison.differences.narrated_spots_equal : null, comparison.differences && comparison.differences.narrated_spots_equal ? "ok" : comparison.comparison_available ? "warn" : null],
+        ["Latest Spot Equal", comparison.differences ? comparison.differences.latest_spot_name_equal : null, comparison.differences && comparison.differences.latest_spot_name_equal ? "ok" : comparison.comparison_available ? "warn" : null],
       ]);
       renderPanel(elements.latestReportPanel, [
         ["Report ID", latestReport.report_id || null],

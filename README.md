@@ -1125,6 +1125,25 @@ curl http://127.0.0.1:8301/reports/latest
 curl http://127.0.0.1:8301/reports/recent
 ```
 
+Round 039 comparison baseline:
+- the harness can now compare:
+  - latest `live_runtime` report
+  - latest `compatibility_shim` report
+- the comparison stays compact and report-driven
+- it uses persisted artifacts only and does not rerun validation
+- current compared fields include:
+  - pass/fail
+  - route completion
+  - first/second stop truth
+  - recent triggered/narrated spots
+  - latest spot
+- missing report cases are explicit
+
+How to inspect the latest comparison:
+```shell
+curl http://127.0.0.1:8301/reports/compare
+```
+
 Focused docs:
 - `docs/MVSIM_LIVE_RUNTIME_BRINGUP.md`
 - `docs/MVSIM_LIVE_POSE_BRIDGE.md`

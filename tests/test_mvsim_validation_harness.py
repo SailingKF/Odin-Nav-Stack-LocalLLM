@@ -26,6 +26,28 @@ class _FakeHarnessRuntime:
             "route_completed": True,
             "report_path": "session_logs/mvsim_validation_harness/reports/20260406T120000Z-live_runtime.json",
         }
+        self._comparison = {
+            "status": "ready",
+            "comparison_available": True,
+            "missing_modes": [],
+            "live_runtime_report": {
+                "report_id": "20260406T120000Z-live_runtime",
+                "validation_mode": "live_runtime",
+                "passed": True,
+                "route_completed": True,
+            },
+            "compatibility_shim_report": {
+                "report_id": "20260406T120100Z-compatibility_shim",
+                "validation_mode": "compatibility_shim",
+                "passed": True,
+                "route_completed": True,
+            },
+            "differences": {
+                "triggered_spots_equal": True,
+                "narrated_spots_equal": True,
+                "latest_spot_name_equal": True,
+            },
+        }
         self._status = {
             "status": "ok",
             "service": "mvsim-validation-harness",
@@ -104,6 +126,7 @@ class _FakeHarnessRuntime:
             "last_validation_result": None,
             "latest_report": self._latest_report,
             "recent_reports": [self._latest_report],
+            "latest_comparison": self._comparison,
         }
 
     def status(self) -> dict:
@@ -114,6 +137,9 @@ class _FakeHarnessRuntime:
 
     def recent_reports(self, limit: int = 5) -> list:
         return [self._latest_report][:limit]
+
+    def latest_comparison_summary(self) -> dict:
+        return self._comparison
 
     def start_local_stack(self, validation_mode: str = "live_runtime") -> dict:
         self._status["validation_modes"]["selected_validation_mode"] = validation_mode
@@ -291,12 +317,14 @@ class MVSimValidationHarnessTests(unittest.TestCase):
         debug_link = client.get("/debug-link")
         latest_report = client.get("/reports/latest")
         recent_reports = client.get("/reports/recent")
+        comparison = client.get("/reports/compare")
 
         self.assertEqual(page.status_code, 200)
         self.assertIn("MVSim Validation Harness", page.text)
         self.assertIn("Run MVSim Validation", page.text)
         self.assertIn("Configured MVSim Mode", page.text)
         self.assertIn("Validation Mode", page.text)
+        self.assertIn("Live Vs Compatibility", page.text)
         self.assertIn("Latest Report", page.text)
         self.assertIn("Recent Runs", page.text)
         self.assertEqual(status.status_code, 200)
@@ -308,6 +336,7 @@ class MVSimValidationHarnessTests(unittest.TestCase):
         self.assertEqual(debug_link.json()["debug_url"], "http://127.0.0.1:8000/debug")
         self.assertEqual(latest_report.json()["latest_report"]["report_id"], "20260406T120000Z-live_runtime")
         self.assertEqual(recent_reports.json()["recent_reports"][0]["validation_mode"], "live_runtime")
+        self.assertEqual(comparison.json()["latest_comparison"]["status"], "ready")
 
     def test_harness_can_run_compatibility_mode_request(self) -> None:
         client = TestClient(create_app(runtime=_FakeHarnessRuntime()))

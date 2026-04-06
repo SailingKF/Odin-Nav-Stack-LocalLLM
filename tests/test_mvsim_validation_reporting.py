@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 
 from services.mvsim_validation_harness.reporting import (
     ValidationReportStore,
+    build_latest_mode_comparison,
     build_validation_report,
 )
 
@@ -83,6 +84,45 @@ class MVSimValidationReportingTests(unittest.TestCase):
         self.assertEqual(latest["report_id"], "20260406T120100Z-live_runtime")
         self.assertEqual(recent[0]["report_id"], "20260406T120100Z-live_runtime")
         self.assertEqual(recent[1]["report_id"], "20260406T120000Z-compatibility_shim")
+
+    def test_build_latest_mode_comparison_handles_both_modes(self) -> None:
+        summary = build_latest_mode_comparison(
+            latest_live_report={
+                "report_id": "live-1",
+                "validation_mode": "live_runtime",
+                "passed": True,
+                "route_completed": True,
+                "recent_triggered_spot_ids": ["gate", "plaza", "gallery"],
+                "recent_narrated_spot_ids": ["gate", "plaza", "gallery"],
+                "latest_spot_name": "History Gallery",
+            },
+            latest_compatibility_report={
+                "report_id": "compat-1",
+                "validation_mode": "compatibility_shim",
+                "passed": True,
+                "route_completed": True,
+                "recent_triggered_spot_ids": ["gate", "plaza", "gallery"],
+                "recent_narrated_spot_ids": ["gate", "plaza", "gallery"],
+                "latest_spot_name": "History Gallery",
+            },
+        )
+
+        self.assertEqual(summary["status"], "ready")
+        self.assertTrue(summary["comparison_available"])
+        self.assertEqual(summary["missing_modes"], [])
+        self.assertTrue(summary["differences"]["triggered_spots_equal"])
+        self.assertTrue(summary["differences"]["narrated_spots_equal"])
+        self.assertTrue(summary["differences"]["latest_spot_name_equal"])
+
+    def test_build_latest_mode_comparison_handles_missing_live_report(self) -> None:
+        summary = build_latest_mode_comparison(
+            latest_live_report=None,
+            latest_compatibility_report={"report_id": "compat-1", "validation_mode": "compatibility_shim"},
+        )
+
+        self.assertEqual(summary["status"], "missing_reports")
+        self.assertFalse(summary["comparison_available"])
+        self.assertEqual(summary["missing_modes"], ["live_runtime"])
 
 
 if __name__ == "__main__":

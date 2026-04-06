@@ -74,6 +74,10 @@ def create_app(
     def recent_reports(limit: int = 5) -> dict:
         return {"recent_reports": active_runtime.recent_reports(limit=limit)}
 
+    @app.get("/reports/compare")
+    def compare_reports() -> dict:
+        return {"latest_comparison": active_runtime.latest_comparison_summary()}
+
     @app.get("/debug-link")
     def debug_link() -> dict:
         return {"debug_url": active_runtime.debug_url}

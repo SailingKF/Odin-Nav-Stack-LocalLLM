@@ -15,6 +15,7 @@ from adapters.sim.projection import SimPoseProjectionConfig
 from services.deployment_profile import build_deployment_endpoint_contract, build_deployment_launch_plan
 from services.mvsim_validation_harness.reporting import (
     ValidationReportStore,
+    build_latest_mode_comparison,
     build_validation_report,
 )
 from services.sim_publisher_bridge.http_client import SimIngressHttpClient
@@ -255,6 +256,14 @@ class MVSimValidationHarnessRuntime:
     def recent_reports(self, limit: int = 5) -> List[Dict[str, Any]]:
         return self._report_store.read_recent_reports(limit=limit)
 
+    def latest_comparison_summary(self) -> Dict[str, Any]:
+        latest_live = self._report_store.read_latest_report_for_mode("live_runtime")
+        latest_compatibility = self._report_store.read_latest_report_for_mode("compatibility_shim")
+        return build_latest_mode_comparison(
+            latest_live_report=latest_live,
+            latest_compatibility_report=latest_compatibility,
+        )
+
     def _persist_validation_report(self, validation_result: Dict[str, Any], service_specs: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
         report = build_validation_report(
             validation_result=validation_result,
@@ -388,6 +397,7 @@ class MVSimValidationHarnessRuntime:
             "last_validation_result": self._last_validation_result,
             "latest_report": self.latest_report(),
             "recent_reports": self.recent_reports(),
+            "latest_comparison": self.latest_comparison_summary(),
         }
 
     def _wait_for_service(
