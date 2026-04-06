@@ -903,6 +903,38 @@ Migration intent in this round:
 Focused contract doc:
 - `docs/DEPLOYMENT_CONFIG_HYGIENE.md`
 
+## MVSim Minimal Integration
+
+This iteration adds a narrow MVSim-oriented compatibility path for PC-side end-to-end simulation without bringing in Isaac.
+
+What is included:
+- an MVSim-style planar observation source in `services/sim_publisher_bridge/mvsim_source.py`
+- a sample observation stream in `content/sim/demo_mvsim_pose_stream.yaml`
+- a runnable bridge demo in `scripts/run_mvsim_compat_bridge_demo.py`
+- a sim-aware API proxy mode so `python scripts/run_api_server.py --config configs/sim.yaml` can keep serving `/debug` while observing the running sim-ingress runtime
+
+What is real in this round:
+- real HTTP ingress through `/runtime/start`, `/poses/batch`, and `/stream/finish`
+- real tour/session/narration behavior downstream of sim-ingress
+- real `/debug`-backed API observation through the sim-profile API server
+
+What remains compatibility scaffolding:
+- the current MVSim path replays MVSim-style planar observations from a file
+- it does not yet claim a direct live MVSim process/runtime integration
+
+PC validation flow:
+```shell
+python scripts/run_sim_pose_ingress_server.py --config configs/sim.yaml --host 127.0.0.1 --port 8100
+python scripts/run_api_server.py --config configs/sim.yaml --host 127.0.0.1 --port 8000
+python scripts/run_mvsim_compat_bridge_demo.py --config configs/sim.yaml --base-url http://127.0.0.1:8100
+```
+
+Open the debug page:
+- `http://127.0.0.1:8000/debug`
+
+Focused doc:
+- `docs/MVSIM_MINIMAL_INTEGRATION.md`
+
 How to validate the service-backed path:
 ```shell
 python scripts/run_mock_tour.py

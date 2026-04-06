@@ -24,6 +24,7 @@ from services.deployment_profile import (
     build_deployment_readiness,
     build_deployment_verification_manifest,
 )
+from services.sim_publisher_bridge.http_client import SimIngressHttpClient
 
 
 def _build_audio_summary(
@@ -271,3 +272,129 @@ class MockTourApiRuntime:
             "message": "question answered",
             **response,
         }
+
+
+class SimIngressProxyApiRuntime:
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        repo_root: Path,
+        ingress_client: Optional[SimIngressHttpClient] = None,
+    ) -> None:
+        self._config = config
+        self._repo_root = repo_root
+        self._deployment_profile = build_deployment_profile(config)
+        self._deployment_preflight = build_deployment_preflight(config, repo_root)
+        self._deployment_launch_plan = build_deployment_launch_plan(config)
+        self._deployment_endpoint_contract = build_deployment_endpoint_contract(
+            config,
+            self._deployment_launch_plan,
+        )
+        self._deployment_config_hygiene = build_deployment_config_hygiene(
+            config,
+            self._deployment_endpoint_contract,
+        )
+        self._deployment_readiness = build_deployment_readiness(
+            self._deployment_profile,
+            self._deployment_preflight,
+            self._deployment_launch_plan,
+        )
+        self._deployment_command_manifest = build_deployment_command_manifest(
+            config,
+            self._deployment_launch_plan,
+            self._deployment_endpoint_contract,
+        )
+        self._deployment_verification_manifest = build_deployment_verification_manifest(
+            self._deployment_command_manifest,
+            self._deployment_endpoint_contract,
+        )
+        endpoint_by_service_id = {
+            str(item.get("service_id")): item
+            for item in list(self._deployment_endpoint_contract.get("services") or [])
+            if item.get("service_id")
+        }
+        sim_endpoint = endpoint_by_service_id.get("sim_pose_ingress_server") or {}
+        self._proxy_target = str(sim_endpoint.get("base_url") or "http://127.0.0.1:8100")
+        self._client = ingress_client or SimIngressHttpClient(self._proxy_target)
+
+    @classmethod
+    def from_config_path(
+        cls,
+        config_path: Path,
+        repo_root: Path,
+    ) -> "SimIngressProxyApiRuntime":
+        with config_path.open("r", encoding="utf-8") as handle:
+            config = yaml.safe_load(handle) or {}
+        return cls(config=config, repo_root=repo_root)
+
+    def _with_proxy_metadata(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        enriched = dict(payload)
+        enriched["api_mode"] = "sim_ingress_proxy"
+        enriched["proxy_target"] = self._proxy_target
+        return enriched
+
+    def health(self) -> Dict[str, Any]:
+        upstream = self._with_proxy_metadata(self._client.health())
+        upstream["service"] = "tour-api-sim-proxy"
+        return upstream
+
+    def state(self) -> Dict[str, Any]:
+        return self._with_proxy_metadata(self._client.state())
+
+    def start_tour(self) -> Dict[str, Any]:
+        payload = self._client.start_runtime()
+        return {
+            "ok": True,
+            "action": "start",
+            "message": "proxied start to sim ingress runtime",
+            "state": self._with_proxy_metadata(payload.get("state") or {}),
+        }
+
+    def pause_tour(self) -> Dict[str, Any]:
+        payload = self._client.pause_tour()
+        return {
+            "ok": bool(payload.get("ok", True)),
+            "action": "pause",
+            "message": payload.get("message", "proxied pause to sim ingress runtime"),
+            "state": self._with_proxy_metadata(payload.get("state") or {}),
+        }
+
+    def resume_tour(self) -> Dict[str, Any]:
+        payload = self._client.resume_tour()
+        return {
+            "ok": bool(payload.get("ok", True)),
+            "action": "resume",
+            "message": payload.get("message", "proxied resume to sim ingress runtime"),
+            "state": self._with_proxy_metadata(payload.get("state") or {}),
+        }
+
+    def next_poi(self) -> Dict[str, Any]:
+        payload = self._client.next_poi()
+        return {
+            "ok": bool(payload.get("ok", True)),
+            "action": "next",
+            "message": payload.get("message", "proxied next to sim ingress runtime"),
+            "state": self._with_proxy_metadata(payload.get("state") or {}),
+        }
+
+    def latest_session(self) -> Dict[str, Any]:
+        return self._with_proxy_metadata(self._client.latest_session())
+
+    def ask_question(self, question: str) -> Dict[str, Any]:
+        payload = dict(self._client.ask_question(question))
+        if "state" in payload and isinstance(payload["state"], dict):
+            payload["state"] = self._with_proxy_metadata(payload["state"])
+        payload["api_mode"] = "sim_ingress_proxy"
+        payload["proxy_target"] = self._proxy_target
+        return payload
+
+
+def build_api_runtime_from_config_path(
+    config_path: Path,
+    repo_root: Path,
+):
+    with config_path.open("r", encoding="utf-8") as handle:
+        config = yaml.safe_load(handle) or {}
+    if str(config.get("pose_provider_type")) == "sim_ingress":
+        return SimIngressProxyApiRuntime(config=config, repo_root=repo_root)
+    return MockTourApiRuntime(config=config, repo_root=repo_root)

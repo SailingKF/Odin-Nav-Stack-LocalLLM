@@ -38,3 +38,15 @@ class SimIngressHttpClient:
 
     def latest_session(self) -> dict:
         return self._get_json("/session/latest")
+
+    def pause_tour(self) -> dict:
+        return self._post_json("/tour/pause", {})
+
+    def resume_tour(self) -> dict:
+        return self._post_json("/tour/resume", {})
+
+    def next_poi(self) -> dict:
+        return self._post_json("/tour/next", {})
+
+    def ask_question(self, question: str) -> dict:
+        return self._post_json("/tour/question", {"question": question})

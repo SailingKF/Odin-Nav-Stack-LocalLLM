@@ -53,3 +53,8 @@ isaac_source:
     required_modules:
       - omni.isaac.core
       - omni.isaac.core.utils.stage
+mvsim_integration:
+  mode: compatibility_shim
+  observation_file: content/sim/demo_mvsim_pose_stream.yaml
+  assumed_frame_id: map
+  vehicle_name: tour_bot

@@ -182,6 +182,21 @@ class SimPoseIngressRuntime:
         self._orchestrator = self._build_orchestrator()
         return self._orchestrator.start()
 
+    def pause(self) -> Dict[str, Any]:
+        if self._orchestrator is None:
+            return self.state()
+        return self._orchestrator.pause()
+
+    def resume(self) -> Dict[str, Any]:
+        if self._orchestrator is None:
+            return self.state()
+        return self._orchestrator.resume()
+
+    def next_poi(self) -> Dict[str, Any]:
+        if self._orchestrator is None:
+            return self.state()
+        return self._orchestrator.next_poi()
+
     def ingest_pose(self, pose: Pose2D) -> Pose2D:
         if self._pose_provider is None:
             raise RuntimeError("Start the sim runtime before pushing poses.")
@@ -208,3 +223,21 @@ class SimPoseIngressRuntime:
         if self._orchestrator is not None:
             return self._orchestrator.get_latest_session_summary()
         return JsonlSessionStore.read_latest_session_summary(self._session_log_dir)
+
+    def ask_question(self, question: str) -> Dict[str, Any]:
+        if self._orchestrator is None:
+            return {
+                "ok": False,
+                "action": "question",
+                "message": "no active tour",
+                "question": question,
+                "answer_text": "Start the sim ingress runtime before asking follow-up questions.",
+                "state": self.state(),
+            }
+        response = self._orchestrator.answer_question(question)
+        return {
+            "ok": True,
+            "action": "question",
+            "message": "question answered",
+            **response,
+        }

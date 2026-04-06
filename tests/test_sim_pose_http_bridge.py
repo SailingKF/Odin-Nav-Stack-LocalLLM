@@ -90,6 +90,20 @@ class SimPoseHttpBridgeTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["pose"]["label"], "gate_trigger_edge")
 
+    def test_question_endpoint_is_available_after_pose_ingress(self) -> None:
+        self.client.post("/runtime/start", json={})
+        self.client.post(
+            "/poses/batch",
+            json={"poses": [{"x": 0.0, "y": 0.0, "label": "gate_inside"}]},
+        )
+
+        response = self.client.post("/tour/question", json={"question": "Why start here?"})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertIn("East Gate", payload["spot_name"])
+
 
 if __name__ == "__main__":
     unittest.main()

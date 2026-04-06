@@ -19,6 +19,10 @@ class PoseBatchRequest(BaseModel):
     poses: List[PosePayload]
 
 
+class TourQuestionRequest(BaseModel):
+    question: str
+
+
 def _payload_to_dict(model: BaseModel) -> dict:
     dump = getattr(model, "model_dump", None)
     if callable(dump):
@@ -47,6 +51,33 @@ def create_app(
             "ok": True,
             "action": "start",
             "state": active_runtime.start(),
+        }
+
+    @app.post("/tour/pause")
+    def pause_tour() -> dict:
+        return {
+            "ok": True,
+            "action": "pause",
+            "message": "tour paused",
+            "state": active_runtime.pause(),
+        }
+
+    @app.post("/tour/resume")
+    def resume_tour() -> dict:
+        return {
+            "ok": True,
+            "action": "resume",
+            "message": "tour resumed",
+            "state": active_runtime.resume(),
+        }
+
+    @app.post("/tour/next")
+    def next_poi() -> dict:
+        return {
+            "ok": True,
+            "action": "next",
+            "message": "advanced to next poi",
+            "state": active_runtime.next_poi(),
         }
 
     @app.post("/poses")
@@ -84,5 +115,9 @@ def create_app(
     @app.get("/session/latest")
     def latest_session() -> dict:
         return active_runtime.latest_session()
+
+    @app.post("/tour/question")
+    def ask_question(payload: TourQuestionRequest) -> dict:
+        return active_runtime.ask_question(payload.question)
 
     return app

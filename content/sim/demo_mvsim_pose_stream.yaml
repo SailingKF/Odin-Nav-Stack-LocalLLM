@@ -1,0 +1,51 @@
+world_name: odin_demo_world
+vehicle_name: tour_bot
+observations:
+  - sim_time_sec: 0.0
+    vehicle: tour_bot
+    frame_id: map
+    note: gate_approach
+    pose2d:
+      x_m: -1.2
+      y_m: 0.0
+      yaw_rad: 0.0
+    velocity2d:
+      vx_mps: 0.4
+      vy_mps: 0.0
+      yaw_rate_radps: 0.0
+  - sim_time_sec: 0.5
+    vehicle: tour_bot
+    frame_id: map
+    note: gate_inside
+    pose2d:
+      x_m: 0.0
+      y_m: 0.0
+      yaw_rad: 0.0
+    velocity2d:
+      vx_mps: 0.2
+      vy_mps: 0.0
+      yaw_rate_radps: 0.0
+  - sim_time_sec: 1.2
+    vehicle: tour_bot
+    frame_id: map
+    note: plaza_inside
+    pose2d:
+      x_m: 5.0
+      y_m: 1.0
+      yaw_rad: 0.0
+    velocity2d:
+      vx_mps: 0.3
+      vy_mps: 0.0
+      yaw_rate_radps: 0.0
+  - sim_time_sec: 2.1
+    vehicle: tour_bot
+    frame_id: map
+    note: gallery_inside
+    pose2d:
+      x_m: 9.5
+      y_m: -0.5
+      yaw_rad: 0.0
+    velocity2d:
+      vx_mps: 0.3
+      vy_mps: 0.0
+      yaw_rate_radps: 0.0
