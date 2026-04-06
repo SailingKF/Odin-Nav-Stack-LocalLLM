@@ -20,6 +20,8 @@ Latest comparison export artifacts are stored under:
 
 - `session_logs/mvsim_validation_harness/comparison_exports/`
 
+Human-readable companion exports are stored in the same directory with the same export id and a `.md` suffix.
+
 Each completed harness validation writes one JSON file.
 
 Current file naming shape:
@@ -150,6 +152,18 @@ Current export fields include:
 - `differences`
 
 This export is generated from the latest persisted comparison inputs only.
+
+The harness now also emits a very small human-readable companion export in Markdown.
+
+That Markdown companion includes:
+
+- comparison status
+- comparability status
+- missing modes
+- guardrail reasons
+- compact live report summary
+- compact compatibility report summary
+- compared outcome flags
 
 It does not:
 

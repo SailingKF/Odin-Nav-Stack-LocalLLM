@@ -180,6 +180,31 @@ def _compact_report_view(report: Optional[Dict[str, Any]]) -> Optional[Dict[str,
     }
 
 
+def _markdown_value(value: Any) -> str:
+    if value is None or value == "":
+        return "N/A"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value) if value else "N/A"
+    return str(value)
+
+
+def _markdown_identity_summary(report: Dict[str, Any]) -> str:
+    identity = _compact_identity_view(report.get("validation_asset_identity"))
+    if not identity:
+        return "N/A"
+    pairs = [
+        f"world={_markdown_value(identity.get('world_file'))}",
+        f"vehicle={_markdown_value(identity.get('vehicle_name'))}",
+        f"route={_markdown_value(identity.get('route_file'))}",
+        f"poi={_markdown_value(identity.get('poi_file'))}",
+        f"align={_markdown_value(identity.get('alignment_strategy'))}",
+        f"motion={_markdown_value(identity.get('motion_strategy'))}",
+    ]
+    return " | ".join(pairs)
+
+
 def build_latest_comparison_export(
     comparison_summary: Dict[str, Any],
     *,
@@ -205,6 +230,59 @@ def build_latest_comparison_export(
         else None,
         "differences": _json_copy(comparison_summary.get("differences")),
     }
+
+
+def build_human_readable_comparison_export(export_payload: Dict[str, Any]) -> str:
+    live_report = dict(export_payload.get("live_runtime_report") or {})
+    compatibility_report = dict(export_payload.get("compatibility_shim_report") or {})
+    lines = [
+        "# Latest Comparison Export",
+        "",
+        f"- Export ID: {_markdown_value(export_payload.get('export_id'))}",
+        f"- Created At: {_markdown_value(export_payload.get('created_at'))}",
+        f"- Comparison Status: {_markdown_value(export_payload.get('comparison_status'))}",
+        f"- Comparability Status: {_markdown_value(export_payload.get('comparability_status'))}",
+        f"- Missing Modes: {_markdown_value(export_payload.get('missing_modes'))}",
+        "",
+        "## Guardrail Reasons",
+    ]
+    reasons = list(export_payload.get("guardrail_reasons") or [])
+    if reasons:
+        lines.extend([f"- {reason}" for reason in reasons])
+    else:
+        lines.append("- None")
+
+    lines.extend(
+        [
+            "",
+            "## Live Runtime Report",
+            f"- Report ID: {_markdown_value(live_report.get('report_id'))}",
+            f"- Status: {_markdown_value(live_report.get('status'))}",
+            f"- Passed: {_markdown_value(live_report.get('passed'))}",
+            f"- Route Completed: {_markdown_value(live_report.get('route_completed'))}",
+            f"- Triggered Spots: {_markdown_value(live_report.get('recent_triggered_spot_ids'))}",
+            f"- Narrated Spots: {_markdown_value(live_report.get('recent_narrated_spot_ids'))}",
+            f"- Identity: {_markdown_identity_summary(live_report)}",
+            "",
+            "## Compatibility Shim Report",
+            f"- Report ID: {_markdown_value(compatibility_report.get('report_id'))}",
+            f"- Status: {_markdown_value(compatibility_report.get('status'))}",
+            f"- Passed: {_markdown_value(compatibility_report.get('passed'))}",
+            f"- Route Completed: {_markdown_value(compatibility_report.get('route_completed'))}",
+            f"- Triggered Spots: {_markdown_value(compatibility_report.get('recent_triggered_spot_ids'))}",
+            f"- Narrated Spots: {_markdown_value(compatibility_report.get('recent_narrated_spot_ids'))}",
+            f"- Identity: {_markdown_identity_summary(compatibility_report)}",
+            "",
+            "## Compared Outcome Flags",
+        ]
+    )
+    differences = dict(export_payload.get("differences") or {})
+    if differences:
+        lines.extend([f"- {key}: {_markdown_value(value)}" for key, value in differences.items()])
+    else:
+        lines.append("- None")
+    lines.append("")
+    return "\n".join(lines)
 
 
 def build_latest_mode_comparison(
@@ -379,19 +457,30 @@ class ComparisonExportStore:
     def _export_path(self, export_id: str) -> Path:
         return self._root_dir / f"{export_id}.json"
 
-    def write_export(self, export_payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _human_export_path(self, export_id: str) -> Path:
+        return self._root_dir / f"{export_id}.md"
+
+    def write_export(self, export_payload: Dict[str, Any], human_readable_text: Optional[str] = None) -> Dict[str, Any]:
         export_id = str(export_payload["export_id"])
         path = self._export_path(export_id)
         with path.open("w", encoding="utf-8") as handle:
             json.dump(export_payload, handle, ensure_ascii=False, indent=2)
+        if human_readable_text is not None:
+            self._human_export_path(export_id).write_text(human_readable_text, encoding="utf-8")
         persisted = dict(export_payload)
         persisted["export_path"] = str(path)
+        human_path = self._human_export_path(export_id)
+        if human_path.exists():
+            persisted["human_readable_export_path"] = str(human_path)
         return persisted
 
     def _load_export(self, path: Path) -> Dict[str, Any]:
         with path.open("r", encoding="utf-8") as handle:
             payload = json.load(handle)
         payload["export_path"] = str(path)
+        human_path = self._human_export_path(path.stem)
+        if human_path.exists():
+            payload["human_readable_export_path"] = str(human_path)
         return payload
 
     def read_latest_export(self) -> Optional[Dict[str, Any]]:
@@ -399,3 +488,17 @@ class ComparisonExportStore:
         if not files:
             return None
         return self._load_export(files[-1])
+
+    def read_latest_human_readable_export(self) -> Optional[Dict[str, Any]]:
+        latest = self.read_latest_export()
+        if not latest:
+            return None
+        human_path = latest.get("human_readable_export_path")
+        if not human_path:
+            return None
+        path = Path(human_path)
+        return {
+            "export_id": latest.get("export_id"),
+            "human_readable_export_path": str(path),
+            "content": path.read_text(encoding="utf-8"),
+        }

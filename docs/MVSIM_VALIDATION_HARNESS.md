@@ -178,11 +178,13 @@ Current read surfaces:
 - `GET /reports/compare`
 - `POST /reports/compare/export`
 - `GET /reports/compare/export/latest`
+- `GET /reports/compare/export/latest/human`
 - harness status also includes:
   - `latest_report`
   - `recent_reports`
   - `latest_comparison`
   - `latest_comparison_export`
+  - `latest_comparison_human_export`
 
 This means an operator can inspect the most recent validation result later without replaying the run.
 It also means the harness can now show a compact latest live-vs-compatibility sanity check without rerunning either path.
@@ -216,6 +218,7 @@ The harness page now also provides a narrow export affordance:
 
 - `Export Latest Comparison`
 - `Open Latest Export`
+- `Open Human Export`
 
 Current required asset fields for direct comparability are:
 

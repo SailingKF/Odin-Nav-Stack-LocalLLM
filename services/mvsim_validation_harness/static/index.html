@@ -57,6 +57,7 @@
           <button id="runValidation" class="secondary" type="button">Run MVSim Validation</button>
           <button id="exportComparison" class="ghost" type="button">Export Latest Comparison</button>
           <a id="openLatestExport" class="button-link ghost" href="#" target="_blank" rel="noopener noreferrer">Open Latest Export</a>
+          <a id="openLatestHumanExport" class="button-link ghost" href="#" target="_blank" rel="noopener noreferrer">Open Human Export</a>
           <button id="refreshStatus" class="ghost" type="button">Refresh Status</button>
           <button id="stopStack" class="warning" type="button">Stop Started Services</button>
           <a id="openDebug" class="button-link primary" href="#" target="_blank" rel="noopener noreferrer">Open /debug</a>
@@ -91,6 +92,7 @@
       questionInput: document.getElementById("questionInput"),
       openDebug: document.getElementById("openDebug"),
       openLatestExport: document.getElementById("openLatestExport"),
+      openLatestHumanExport: document.getElementById("openLatestHumanExport"),
       modeSelect: document.getElementById("modeSelect"),
     };
     function setFeedback(message, isError=false) { elements.feedback.textContent = message; elements.feedback.classList.toggle("error", Boolean(isError)); }
@@ -132,6 +134,7 @@
       const recentReports = payload.recent_reports || [];
       const comparison = payload.latest_comparison || {};
       const latestComparisonExport = payload.latest_comparison_export || {};
+      const latestComparisonHumanExport = payload.latest_comparison_human_export || {};
       const validationModes = payload.validation_modes || {};
       if (Array.isArray(validationModes.available) && validationModes.available.length) {
         elements.modeSelect.innerHTML = "";
@@ -147,6 +150,7 @@
       }
       elements.openDebug.href = payload.debug_url || "#";
       elements.openLatestExport.href = latestComparisonExport.export_id ? "/reports/compare/export/latest" : "#";
+      elements.openLatestHumanExport.href = latestComparisonHumanExport.human_readable_export_path ? "/reports/compare/export/latest/human" : "#";
       renderPanel(elements.summaryPanel, [
         ["Harness URL", payload.harness_url],
         ["Default Validation Mode", validationModes.default_validation_mode || null],
@@ -170,6 +174,7 @@
         ["Follow-up Question", snapshot.followup_question_ok, snapshot.followup_question_ok ? "ok" : "warn"],
         ["Debug Available", snapshot.debug_available, snapshot.debug_available ? "ok" : "warn"],
         ["Latest Comparison Export", latestComparisonExport.export_id || null, latestComparisonExport.export_id ? "ok" : "warn"],
+        ["Latest Human Export", latestComparisonHumanExport.export_id || null, latestComparisonHumanExport.export_id ? "ok" : "warn"],
       ]);
       renderPanel(elements.servicePanel, Object.values(serviceChecks).map(item => [
         item.display_name, `${item.status} | ${item.detail}`, item.status==="healthy" ? "ok" : item.status==="port_conflict" ? "warn" : "fail"
@@ -203,6 +208,7 @@
         ["Narrated Spots Equal", comparison.differences ? comparison.differences.narrated_spots_equal : null, comparison.differences && comparison.differences.narrated_spots_equal ? "ok" : comparison.comparison_available ? "warn" : null],
         ["Latest Spot Equal", comparison.differences ? comparison.differences.latest_spot_name_equal : null, comparison.differences && comparison.differences.latest_spot_name_equal ? "ok" : comparison.comparison_available ? "warn" : null],
         ["Latest Export Path", latestComparisonExport.export_path || null],
+        ["Latest Human Export Path", latestComparisonHumanExport.human_readable_export_path || null],
       ]);
       renderPanel(elements.latestReportPanel, [
         ["Report ID", latestReport.report_id || null],

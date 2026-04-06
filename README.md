@@ -1182,6 +1182,19 @@ Round 041 latest-comparison export baseline:
   - `Export Latest Comparison`
   - `Open Latest Export`
 
+Round 042 human-readable comparison export baseline:
+- the harness now writes a Markdown companion export next to the JSON export
+- current human-readable export path shape is:
+  - `session_logs/mvsim_validation_harness/comparison_exports/<export_id>.md`
+- current human-readable export endpoint is:
+  - `GET /reports/compare/export/latest/human`
+- the Markdown export stays intentionally compact and includes:
+  - comparison status
+  - comparability status
+  - guardrail reasons
+  - compact live/compatibility report summaries
+  - compared outcome flags
+
 Focused docs:
 - `docs/MVSIM_LIVE_RUNTIME_BRINGUP.md`
 - `docs/MVSIM_LIVE_POSE_BRIDGE.md`

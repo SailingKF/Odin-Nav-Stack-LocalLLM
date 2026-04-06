@@ -80,6 +80,12 @@ class _FakeHarnessRuntime:
             "comparability_status": "comparable",
             "guardrail_reasons": ["required validation assets match across the latest live and compatibility reports"],
             "export_path": "session_logs/mvsim_validation_harness/comparison_exports/20260406T120200Z-latest_comparison_export.json",
+            "human_readable_export_path": "session_logs/mvsim_validation_harness/comparison_exports/20260406T120200Z-latest_comparison_export.md",
+        }
+        self._latest_human_export = {
+            "export_id": "20260406T120200Z-latest_comparison_export",
+            "human_readable_export_path": "session_logs/mvsim_validation_harness/comparison_exports/20260406T120200Z-latest_comparison_export.md",
+            "content": "# Latest Comparison Export\n",
         }
         self._status = {
             "status": "ok",
@@ -180,6 +186,9 @@ class _FakeHarnessRuntime:
 
     def export_latest_comparison_summary(self) -> dict:
         return self._latest_export
+
+    def latest_comparison_human_export(self) -> dict:
+        return self._latest_human_export
 
     def start_local_stack(self, validation_mode: str = "live_runtime") -> dict:
         self._status["validation_modes"]["selected_validation_mode"] = validation_mode
@@ -360,6 +369,7 @@ class MVSimValidationHarnessTests(unittest.TestCase):
         comparison = client.get("/reports/compare")
         latest_export = client.get("/reports/compare/export/latest")
         export = client.post("/reports/compare/export")
+        latest_human_export = client.get("/reports/compare/export/latest/human")
 
         self.assertEqual(page.status_code, 200)
         self.assertIn("MVSim Validation Harness", page.text)
@@ -371,6 +381,7 @@ class MVSimValidationHarnessTests(unittest.TestCase):
         self.assertIn("Recent Runs", page.text)
         self.assertIn("Comparability", page.text)
         self.assertIn("Export Latest Comparison", page.text)
+        self.assertIn("Open Human Export", page.text)
         self.assertEqual(status.status_code, 200)
         self.assertEqual(status.json()["service"], "mvsim-validation-harness")
         self.assertTrue(start.json()["ok"])
@@ -384,6 +395,8 @@ class MVSimValidationHarnessTests(unittest.TestCase):
         self.assertEqual(comparison.json()["latest_comparison"]["comparability_status"], "comparable")
         self.assertEqual(latest_export.json()["latest_comparison_export"]["export_id"], "20260406T120200Z-latest_comparison_export")
         self.assertEqual(export.json()["latest_comparison_export"]["comparison_status"], "ready")
+        self.assertEqual(latest_human_export.status_code, 200)
+        self.assertIn("Latest Comparison Export", latest_human_export.text)
 
     def test_harness_can_run_compatibility_mode_request(self) -> None:
         client = TestClient(create_app(runtime=_FakeHarnessRuntime()))

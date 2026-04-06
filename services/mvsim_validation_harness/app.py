@@ -2,7 +2,8 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi import HTTPException
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -85,6 +86,16 @@ def create_app(
     @app.get("/reports/compare/export/latest")
     def latest_comparison_export() -> dict:
         return {"latest_comparison_export": active_runtime.latest_comparison_export()}
+
+    @app.get("/reports/compare/export/latest/human")
+    def latest_human_comparison_export() -> PlainTextResponse:
+        payload = active_runtime.latest_comparison_human_export()
+        if not payload:
+            raise HTTPException(status_code=404, detail="latest human-readable comparison export not found")
+        return PlainTextResponse(
+            content=str(payload.get("content") or ""),
+            media_type="text/markdown; charset=utf-8",
+        )
 
     @app.get("/debug-link")
     def debug_link() -> dict:

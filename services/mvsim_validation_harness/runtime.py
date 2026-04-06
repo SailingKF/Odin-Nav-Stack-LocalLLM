@@ -16,6 +16,7 @@ from services.deployment_profile import build_deployment_endpoint_contract, buil
 from services.mvsim_validation_harness.reporting import (
     ComparisonExportStore,
     ValidationReportStore,
+    build_human_readable_comparison_export,
     build_latest_comparison_export,
     build_latest_mode_comparison,
     build_validation_report,
@@ -270,13 +271,20 @@ class MVSimValidationHarnessRuntime:
     def latest_comparison_export(self) -> Optional[Dict[str, Any]]:
         return self._comparison_export_store.read_latest_export()
 
+    def latest_comparison_human_export(self) -> Optional[Dict[str, Any]]:
+        return self._comparison_export_store.read_latest_human_readable_export()
+
     def export_latest_comparison_summary(self) -> Dict[str, Any]:
         comparison_summary = self.latest_comparison_summary()
         export_payload = build_latest_comparison_export(
             comparison_summary,
             harness_url=self._harness_url,
         )
-        return self._comparison_export_store.write_export(export_payload)
+        human_readable_text = build_human_readable_comparison_export(export_payload)
+        return self._comparison_export_store.write_export(
+            export_payload,
+            human_readable_text=human_readable_text,
+        )
 
     def _persist_validation_report(self, validation_result: Dict[str, Any], service_specs: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
         active_config = self._config_for_validation_mode(
@@ -417,6 +425,7 @@ class MVSimValidationHarnessRuntime:
             "recent_reports": self.recent_reports(),
             "latest_comparison": self.latest_comparison_summary(),
             "latest_comparison_export": self.latest_comparison_export(),
+            "latest_comparison_human_export": self.latest_comparison_human_export(),
         }
 
     def _wait_for_service(

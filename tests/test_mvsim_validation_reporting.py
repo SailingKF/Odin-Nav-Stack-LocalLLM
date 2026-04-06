@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 from services.mvsim_validation_harness.reporting import (
     ComparisonExportStore,
     ValidationReportStore,
+    build_human_readable_comparison_export,
     build_latest_comparison_export,
     build_latest_mode_comparison,
     build_validation_report,
@@ -122,14 +123,19 @@ class MVSimValidationReportingTests(unittest.TestCase):
                     "export_id": "20260406T120100Z-latest_comparison_export",
                     "comparison_status": "ready",
                     "comparability_status": "comparable",
-                }
+                },
+                human_readable_text="# Latest Comparison Export\n",
             )
 
             latest = store.read_latest_export()
+            latest_human = store.read_latest_human_readable_export()
 
         self.assertEqual(first["comparison_status"], "missing_reports")
         self.assertEqual(second["comparability_status"], "comparable")
         self.assertEqual(latest["export_id"], "20260406T120100Z-latest_comparison_export")
+        self.assertTrue(latest["human_readable_export_path"].endswith(".md"))
+        self.assertEqual(latest_human["export_id"], "20260406T120100Z-latest_comparison_export")
+        self.assertIn("Latest Comparison Export", latest_human["content"])
 
     def test_build_latest_mode_comparison_handles_both_modes(self) -> None:
         summary = build_latest_mode_comparison(
@@ -238,6 +244,43 @@ class MVSimValidationReportingTests(unittest.TestCase):
         self.assertEqual(export_payload["missing_modes"], ["compatibility_shim"])
         self.assertFalse(export_payload["comparison_available"])
         self.assertIsNone(export_payload["compatibility_shim_report"])
+
+    def test_build_human_readable_comparison_export_is_scan_friendly(self) -> None:
+        markdown = build_human_readable_comparison_export(
+            {
+                "export_id": "20260406T120200Z-latest_comparison_export",
+                "created_at": "2026-04-06T12:02:00+00:00",
+                "comparison_status": "ready",
+                "comparability_status": "comparable",
+                "missing_modes": [],
+                "guardrail_reasons": ["required validation assets match across the latest live and compatibility reports"],
+                "live_runtime_report": {
+                    "report_id": "live-1",
+                    "status": "passed",
+                    "passed": True,
+                    "route_completed": True,
+                    "recent_triggered_spot_ids": ["gate", "plaza"],
+                    "recent_narrated_spot_ids": ["gate", "plaza"],
+                    "validation_asset_identity": {"world_file": "world.xml", "vehicle_name": "tour_bot"},
+                },
+                "compatibility_shim_report": {
+                    "report_id": "compat-1",
+                    "status": "passed",
+                    "passed": True,
+                    "route_completed": True,
+                    "recent_triggered_spot_ids": ["gate", "plaza"],
+                    "recent_narrated_spot_ids": ["gate", "plaza"],
+                    "validation_asset_identity": {"world_file": "world.xml", "vehicle_name": "tour_bot"},
+                },
+                "differences": {"triggered_spots_equal": True},
+            }
+        )
+
+        self.assertIn("# Latest Comparison Export", markdown)
+        self.assertIn("Comparability Status: comparable", markdown)
+        self.assertIn("## Guardrail Reasons", markdown)
+        self.assertIn("## Live Runtime Report", markdown)
+        self.assertIn("## Compatibility Shim Report", markdown)
 
     def test_build_latest_mode_comparison_marks_mismatched_assets_not_directly_comparable(self) -> None:
         summary = build_latest_mode_comparison(
