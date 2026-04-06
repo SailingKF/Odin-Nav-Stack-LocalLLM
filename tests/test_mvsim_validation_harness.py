@@ -24,6 +24,7 @@ class _FakeHarnessRuntime:
             "status": "passed",
             "validation_mode": "live_runtime",
             "route_completed": True,
+            "latest_spot_id": "gallery",
             "latest_pose": {"x": 9.5, "y": -0.5, "label": "tour_bot"},
             "recent_triggered_spot_ids": ["gate", "plaza", "gallery"],
             "recent_narrated_spot_ids": ["gate", "plaza", "gallery"],
@@ -180,6 +181,8 @@ class _FakeHarnessRuntime:
                     "screen": {"x": 88.0, "y": 32.0},
                 },
                 "pose_available": True,
+                "latest_spot_id": "gallery",
+                "latest_spot_name": "History Gallery",
                 "recent_triggered_spot_ids": ["gate", "plaza", "gallery"],
                 "recent_narrated_spot_ids": ["gate", "plaza", "gallery"],
                 "poi_count": 3,
@@ -419,10 +422,12 @@ class MVSimValidationHarnessTests(unittest.TestCase):
         self.assertIn("Comparability", page.text)
         self.assertIn("Export Latest Comparison", page.text)
         self.assertIn("Pending POI", page.text)
+        self.assertIn("Persisted Latest Spot", page.text)
         self.assertIn("Open Human Export", page.text)
         self.assertEqual(status.status_code, 200)
         self.assertEqual(status.json()["service"], "mvsim-validation-harness")
         self.assertEqual(status.json()["validation_map_view"]["status"], "ready")
+        self.assertEqual(status.json()["validation_map_view"]["latest_spot_name"], "History Gallery")
         self.assertTrue(start.json()["ok"])
         self.assertEqual(start.json()["validation_mode"], "live_runtime")
         self.assertEqual(validation.json()["status"], "passed")

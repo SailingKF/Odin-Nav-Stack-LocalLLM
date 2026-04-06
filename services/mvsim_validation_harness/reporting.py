@@ -171,6 +171,7 @@ def _compact_report_view(report: Optional[Dict[str, Any]]) -> Optional[Dict[str,
         "live_first_poi_hit_occurred": report.get("live_first_poi_hit_occurred"),
         "live_second_poi_hit_occurred": report.get("live_second_poi_hit_occurred"),
         "live_second_narration_occurred": report.get("live_second_narration_occurred"),
+        "latest_spot_id": report.get("latest_spot_id"),
         "latest_spot_name": report.get("latest_spot_name"),
         "latest_narration_text": report.get("latest_narration_text"),
         "latest_pose": _json_copy(report.get("latest_pose")),
@@ -261,6 +262,7 @@ def build_human_readable_comparison_export(export_payload: Dict[str, Any]) -> st
             f"- Status: {_markdown_value(live_report.get('status'))}",
             f"- Passed: {_markdown_value(live_report.get('passed'))}",
             f"- Route Completed: {_markdown_value(live_report.get('route_completed'))}",
+            f"- Latest Spot: {_markdown_value(live_report.get('latest_spot_name') or live_report.get('latest_spot_id'))}",
             f"- Latest Pose: {_markdown_value(live_report.get('latest_pose'))}",
             f"- Triggered Spots: {_markdown_value(live_report.get('recent_triggered_spot_ids'))}",
             f"- Narrated Spots: {_markdown_value(live_report.get('recent_narrated_spot_ids'))}",
@@ -271,6 +273,7 @@ def build_human_readable_comparison_export(export_payload: Dict[str, Any]) -> st
             f"- Status: {_markdown_value(compatibility_report.get('status'))}",
             f"- Passed: {_markdown_value(compatibility_report.get('passed'))}",
             f"- Route Completed: {_markdown_value(compatibility_report.get('route_completed'))}",
+            f"- Latest Spot: {_markdown_value(compatibility_report.get('latest_spot_name') or compatibility_report.get('latest_spot_id'))}",
             f"- Latest Pose: {_markdown_value(compatibility_report.get('latest_pose'))}",
             f"- Triggered Spots: {_markdown_value(compatibility_report.get('recent_triggered_spot_ids'))}",
             f"- Narrated Spots: {_markdown_value(compatibility_report.get('recent_narrated_spot_ids'))}",
@@ -375,6 +378,21 @@ def build_validation_report(
             if item.get("spot_id")
         ]
 
+    latest_spot_id = (
+        api_session.get("latest_spot_id")
+        or api_session.get("latest_narrated_spot_id")
+        or api_session.get("latest_triggered_spot_id")
+        or live_summary.get("validated_spot_id")
+        or (recent_narrated_spot_ids[-1] if recent_narrated_spot_ids else None)
+        or (recent_triggered_spot_ids[-1] if recent_triggered_spot_ids else None)
+    )
+    latest_spot_name = (
+        api_session.get("latest_spot_name")
+        or api_session.get("latest_narrated_spot_name")
+        or api_session.get("latest_triggered_spot_name")
+        or live_summary.get("validated_spot_name")
+    )
+
     report_id = f"{_utc_timestamp_slug()}-{validation_result.get('validation_mode', 'unknown')}"
     validation_asset_identity = _build_validation_asset_identity(
         validation_result=validation_result,
@@ -393,7 +411,8 @@ def build_validation_report(
         "debug_url": debug_url,
         "passed": validation_result.get("status") == "passed",
         "session_id": api_session.get("session_id"),
-        "latest_spot_name": api_session.get("latest_spot_name"),
+        "latest_spot_id": latest_spot_id,
+        "latest_spot_name": latest_spot_name,
         "latest_narration_text": api_session.get("latest_narration_text"),
         "latest_pose": api_state.get("last_pose") or final_state.get("last_pose") or api_session.get("latest_pose"),
         "route_completed": bool(final_state.get("route_completed")),

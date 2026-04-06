@@ -72,6 +72,8 @@ class MVSimValidationReportingTests(unittest.TestCase):
         self.assertTrue(report["live_second_poi_hit_occurred"])
         self.assertTrue(report["route_completed"])
         self.assertEqual(report["recent_triggered_spot_ids"], ["gate", "plaza", "gallery"])
+        self.assertEqual(report["latest_spot_id"], "gallery")
+        self.assertEqual(report["latest_spot_name"], "History Gallery")
         self.assertEqual(report["latest_pose"]["x"], 9.5)
         self.assertEqual(report["service_targets"]["api_server"], "http://127.0.0.1:8001/health")
         self.assertEqual(
@@ -351,6 +353,41 @@ class MVSimValidationReportingTests(unittest.TestCase):
         self.assertEqual(summary["comparability_status"], "comparable_with_warnings")
         self.assertIn("motion_strategy", summary["identity_guardrails"]["warnings"])
         self.assertIn("config_name", summary["identity_guardrails"]["warnings"])
+
+    def test_build_validation_report_derives_latest_spot_fallback_from_recent_progress(self) -> None:
+        report = build_validation_report(
+            validation_result={
+                "status": "passed",
+                "validation_mode": "compatibility_shim",
+                "mvsim_mode": "compatibility_shim",
+                "sim_ingress_state": {"route_completed": True, "last_pose": {"x": 9.5, "y": -0.5, "label": "gallery_inside"}},
+                "api_latest_session": {
+                    "session_id": "mock_tour_456",
+                    "latest_spot_name": None,
+                    "latest_narration_text": "Final stop narration.",
+                    "recent_poi_triggers": [
+                        {"spot_id": "gate"},
+                        {"spot_id": "plaza"},
+                        {"spot_id": "gallery"},
+                    ],
+                    "recent_narrations": [
+                        {"spot_id": "gate"},
+                        {"spot_id": "plaza"},
+                        {"spot_id": "gallery"},
+                    ],
+                },
+            },
+            config_path=Path("configs/sim_harness.yaml"),
+            config_payload={
+                "current_route_file": "content/routes/demo_route.yaml",
+                "current_poi_file": "content/poi/demo_pois.yaml",
+            },
+            harness_url="http://127.0.0.1:8301",
+            debug_url="http://127.0.0.1:8001/debug",
+        )
+
+        self.assertEqual(report["latest_spot_id"], "gallery")
+        self.assertIsNone(report["latest_spot_name"])
 
 
 if __name__ == "__main__":

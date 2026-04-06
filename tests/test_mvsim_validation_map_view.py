@@ -78,6 +78,35 @@ class MVSimValidationMapViewTests(unittest.TestCase):
         self.assertEqual(payload["latest_spot_name"], "History Gallery")
         self.assertEqual(payload["poi_markers"][-1]["visual_status"], "active")
 
+    def test_build_validation_map_view_uses_report_only_latest_spot_fallback_after_stack_stops(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+
+        payload = build_validation_map_view(
+            config={
+                "current_route_file": "content/routes/demo_route.yaml",
+                "current_poi_file": "content/poi/demo_pois.yaml",
+            },
+            repo_root=repo_root,
+            latest_report={
+                "validation_mode": "compatibility_shim",
+                "latest_spot_id": "gallery",
+                "latest_spot_name": None,
+                "latest_pose": {"x": 9.5, "y": -0.5, "label": "gallery_inside"},
+                "recent_triggered_spot_ids": ["gate", "plaza", "gallery"],
+                "recent_narrated_spot_ids": ["gate", "plaza", "gallery"],
+            },
+            last_validation_result=None,
+            current_api_state=None,
+            selected_validation_mode="compatibility_shim",
+        )
+
+        self.assertEqual(payload["status"], "ready")
+        self.assertEqual(payload["data_sources"]["pose_source"], "latest_report")
+        self.assertEqual(payload["data_sources"]["progress_source"], "latest_report")
+        self.assertEqual(payload["latest_spot_id"], "gallery")
+        self.assertEqual(payload["latest_spot_name"], "History Gallery")
+        self.assertTrue(payload["poi_markers"][-1]["is_latest"])
+
 
 if __name__ == "__main__":
     unittest.main()

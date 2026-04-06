@@ -60,7 +60,7 @@ def _load_route_bundle(
 def _extract_progress(
     latest_report: Optional[Dict[str, Any]],
     last_validation_result: Optional[Dict[str, Any]],
-) -> Tuple[List[str], List[str], Optional[str], Optional[str], Optional[str]]:
+) -> Tuple[List[str], List[str], Optional[str], Optional[str], Optional[str], Optional[str]]:
     report = dict(latest_report or {})
     validation = dict(last_validation_result or {})
     live_summary = dict(validation.get("live_validation_summary") or {})
@@ -93,15 +93,26 @@ def _extract_progress(
 
     latest_spot_name = (
         api_session.get("latest_spot_name")
+        or api_session.get("latest_narrated_spot_name")
+        or api_session.get("latest_triggered_spot_name")
         or report.get("latest_spot_name")
         or live_summary.get("validated_spot_name")
+    )
+    latest_spot_id = (
+        api_session.get("latest_spot_id")
+        or api_session.get("latest_narrated_spot_id")
+        or api_session.get("latest_triggered_spot_id")
+        or report.get("latest_spot_id")
+        or live_summary.get("validated_spot_id")
+        or (narrated[-1] if narrated else None)
+        or (triggered[-1] if triggered else None)
     )
     latest_narration_text = (
         api_session.get("latest_narration_text")
         or report.get("latest_narration_text")
         or live_summary.get("validated_narration_text")
     )
-    return triggered, narrated, latest_spot_name, latest_narration_text, progress_source
+    return triggered, narrated, latest_spot_id, latest_spot_name, latest_narration_text, progress_source
 
 
 def _extract_pose(
@@ -230,7 +241,7 @@ def build_validation_map_view(
             "poi_markers": [],
         }
 
-    triggered_spot_ids, narrated_spot_ids, latest_spot_name, latest_narration_text, progress_source = _extract_progress(
+    triggered_spot_ids, narrated_spot_ids, latest_spot_id, latest_spot_name, latest_narration_text, progress_source = _extract_progress(
         latest_report,
         last_validation_result,
     )
@@ -240,13 +251,16 @@ def build_validation_map_view(
     to_screen = normalization_bundle.pop("to_screen")
     triggered_set = set(triggered_spot_ids)
     narrated_set = set(narrated_spot_ids)
+    poi_name_by_id = {poi.spot_id: poi.name for poi in ordered_pois}
+    if latest_spot_name is None and latest_spot_id is not None:
+        latest_spot_name = poi_name_by_id.get(str(latest_spot_id))
 
     poi_markers: List[Dict[str, Any]] = []
     route_polyline: List[Dict[str, Any]] = []
     for order, poi in enumerate(ordered_pois, start=1):
         screen = to_screen(float(poi.x), float(poi.y))
         is_active = bool(active_spot_id == poi.spot_id or (active_spot_name and active_spot_name == poi.name))
-        is_latest = bool(latest_spot_name and latest_spot_name == poi.name)
+        is_latest = bool((latest_spot_id and latest_spot_id == poi.spot_id) or (latest_spot_name and latest_spot_name == poi.name))
         if is_active:
             visual_status = "active"
         elif poi.spot_id in narrated_set:
@@ -306,6 +320,7 @@ def build_validation_map_view(
         "pose_available": pose_marker is not None,
         "active_spot_id": active_spot_id,
         "active_spot_name": active_spot_name,
+        "latest_spot_id": latest_spot_id,
         "latest_spot_name": latest_spot_name,
         "latest_narration_text": latest_narration_text,
         "recent_triggered_spot_ids": triggered_spot_ids,

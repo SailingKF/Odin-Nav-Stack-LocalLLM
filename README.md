@@ -1214,6 +1214,16 @@ What this lets an operator do now:
 - see where the current route POIs sit relative to each other
 - confirm whether the latest pose is still near the expected stop
 - visually distinguish pending, triggered, narrated, and active POIs without replaying the whole log mentally
+
+Round 044 report-only map fallback baseline:
+- the persisted harness validation report now keeps:
+  - `latest_spot_id`
+  - `latest_spot_name` when directly available
+- the harness map can now recover latest-stop identity even after the local stack has been stopped
+- fallback behavior is now:
+  - prefer live API state while reachable
+  - otherwise use the latest persisted report pose and latest spot fallback
+- this keeps the operator-facing map truthful without adding a second world model or report analytics layer
   - guardrail reasons
   - compact live/compatibility report summaries
   - compared outcome flags

@@ -123,6 +123,13 @@ This map intentionally stays narrow:
 - coordinate normalization is local to the harness view layer
 - no general map framework, occupancy map, or simulator-side rendering contract
 
+Round 044 tightened the report-only fallback path for that map:
+
+- persisted reports now keep `latest_spot_id`
+- persisted reports keep `latest_spot_name` when that name is directly available at validation time
+- the harness map can now recover the latest stop from report-only state even when the API stack is no longer reachable
+- if only `latest_spot_id` is persisted, the harness resolves the display name from the current repo POI file
+
 ## How Common Problems Are Reported
 
 Current common operator failures are surfaced as:
@@ -178,6 +185,7 @@ Current essentials include:
 - config path
 - pass/fail
 - session id
+- latest spot id/name fallback
 - route completion
 - first/second live stop truth
 - recent triggered spots
