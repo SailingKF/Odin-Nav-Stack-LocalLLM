@@ -68,6 +68,8 @@ The harness currently surfaces at least:
 - configured MVSim mode
 - effective MVSim mode
 - live-runtime availability
+- WSL installability status
+- whether the current shell is elevated
 - sim-ingress reachability
 - sim-profile API reachability
 - `/debug` availability
@@ -96,6 +98,8 @@ Current examples:
   - reported as `failed_precondition`
 - validation is switched to `live_runtime` but no real `mvsim` runtime is available
   - reported as `blocked_live_runtime_unavailable`
+- WSL path is the recommended next step but the current shell is not elevated
+  - surfaced through the WSL enablement section and probe blocker details
 
 ## Scope Limits
 

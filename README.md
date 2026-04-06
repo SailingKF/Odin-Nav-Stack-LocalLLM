@@ -1008,6 +1008,24 @@ Retry-round environment findings on this Windows PC:
 So the repo is now truthful about the next step:
 - the next live-runtime milestone is an environment enablement task, not a simulation-architecture task
 
+Current WSL-specific truth on this PC:
+- `wsl.exe` exists
+- WSL itself is not installed
+- the current shell is not elevated
+- repo probes now surface this explicitly as:
+  - `wsl_requires_elevation`
+
+Quick probe:
+```shell
+python scripts/print_mvsim_live_probe.py --config configs/sim.yaml
+```
+
+If you want to continue the WSL route, the next narrow environment step is:
+```text
+wsl.exe --install -d Ubuntu
+```
+Run that from an elevated Windows terminal, then continue Linux-side MVSim setup there.
+
 Focused doc:
 - `docs/MVSIM_LIVE_RUNTIME_BRINGUP.md`
 

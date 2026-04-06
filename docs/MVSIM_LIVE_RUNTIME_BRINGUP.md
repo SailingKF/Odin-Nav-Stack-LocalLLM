@@ -159,6 +159,45 @@ It is an environment step:
 - either install WSL and use the Linux MVSim/MRPT path
 - or establish a reliable Windows source-build workflow with full git/submodule access and MRPT built first
 
+## Round 032 WSL Enablement Findings
+
+The next round tested the WSL path directly on this PC.
+
+### What was confirmed
+
+- `wsl.exe` exists on this PC
+- WSL itself is **not** installed yet
+- the current shell is **not** elevated
+
+Observed from repo-local probe output:
+
+- `wsl_command_available: true`
+- `wsl_installed: false`
+- `current_shell_elevated: false`
+- `blocker.code: "wsl_requires_elevation"`
+
+### What this means
+
+The narrowest real blocker has become:
+
+- WSL enablement requires an elevated Windows shell on this PC
+
+So this round does not broaden into Linux package installation or MVSim build steps inside WSL, because the base WSL feature cannot be enabled from the current session.
+
+### Recommended next command
+
+From an elevated Windows terminal:
+
+```text
+wsl.exe --install -d Ubuntu
+```
+
+After reboot / first-launch completion, the next narrow step would be:
+
+- verify `wsl.exe --status`
+- verify Ubuntu starts
+- install the Linux-side MVSim/MRPT runtime there
+
 ## Exact Blocker Behavior
 
 When `mvsim_integration.mode` is set to `live_runtime` and the executable is missing:
