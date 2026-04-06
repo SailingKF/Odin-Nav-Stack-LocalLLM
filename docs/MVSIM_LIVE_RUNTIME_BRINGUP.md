@@ -94,14 +94,22 @@ This makes it obvious whether the operator is:
 - ready for live runtime bring-up
 - blocked on a missing `mvsim` runtime
 
-## Current Limitation In This Round
+## Current Truth After Round 033
 
-On this PC, the live-runtime blocker is:
+On this PC, a real Linux-side MVSim runtime now exists inside Ubuntu on WSL2.
 
-- no `mvsim` executable was found on PATH
-- no `mvsim.exe` was found in the common Windows locations checked during validation
+What is true now:
 
-Therefore this round stops in a real blocker state for live mode instead of faking a live end-to-end run.
+- WSL2 is installed and Ubuntu 24.04 launches successfully
+- MRPT dev packages can be installed from the official MRPT stable PPA
+- `mvsim` can be built from source inside Ubuntu
+- the repo-local minimal world can be launched from that Linux runtime in `--headless` mode
+
+What is **not** true yet:
+
+- there is still no Windows-native `mvsim.exe`
+- the validated live runtime currently lives in WSL, not on the Windows PATH
+- the live pose bridge from that running Linux MVSim process into the existing Windows-side stack has not been implemented yet
 
 ## Round 031 Retry Findings
 
@@ -198,6 +206,70 @@ After reboot / first-launch completion, the next narrow step would be:
 - verify Ubuntu starts
 - install the Linux-side MVSim/MRPT runtime there
 
+## Round 033 Linux-Side Runtime Enablement
+
+This round moved past WSL enablement and into a truthful Ubuntu-side runtime bring-up.
+
+### Exact Linux-side commands that succeeded
+
+Inside Ubuntu 24.04 on WSL2, the narrow successful path was:
+
+```text
+apt-get update
+apt-get install -y software-properties-common
+add-apt-repository -y ppa:joseluisblancoc/mrpt-stable
+apt-get install -y libmrpt-dev mrpt-apps
+apt-get install -y build-essential g++ cmake libbox2d-dev protobuf-compiler libprotobuf-dev libzmq3-dev git
+apt-get install -y pybind11-dev libpython3-dev python3.12-venv
+git clone --recursive https://github.com/MRPT/mvsim.git /root/round033-mvsim-src
+mkdir -p /root/round033-mvsim-build
+cd /root/round033-mvsim-build
+cmake /root/round033-mvsim-src
+cmake --build . -j2
+```
+
+### Verified Linux-side runtime command
+
+The verified executable is:
+
+```text
+/root/round033-mvsim-build/bin/mvsim
+```
+
+Verification:
+
+```text
+/root/round033-mvsim-build/bin/mvsim --help
+```
+
+### Repo-local world launch result
+
+The first truthful world launch attempt used:
+
+```text
+/root/round033-mvsim-build/bin/mvsim launch /mnt/c/Users/saili/Desktop/odin_nav_stack_local_llm_docs/content/sim/mvsim/worlds/odin_minimal_tour.world.xml --headless -v INFO
+```
+
+Observed progression:
+
+1. the original repo world failed on color parsing because current MVSim expects `#RRGGBB[AA]`
+2. after updating the world colors, launch failed again because current MVSim expects `<walls><shape>...</shape></walls>` or a model URI instead of legacy repeated `<wall>` tags
+3. after updating the repo-local world to the current wall schema, the headless launch stayed alive and had to be terminated manually by the validation probe
+
+So the world asset is now aligned with the current Linux-side MVSim parser contract used in this repo.
+
+### Operator note
+
+`configs/sim.yaml` now records the validated WSL-side runtime path explicitly:
+
+- `mvsim_integration.runtime_host: wsl`
+- `mvsim_integration.wsl_distribution: Ubuntu`
+- `mvsim_integration.wsl_user: root`
+- `mvsim_integration.wsl_executable_path: /root/round033-mvsim-build/bin/mvsim`
+
+This does not switch the validated end-to-end sim flow away from the compatibility shim.
+It only records the truthful location of the live MVSim runtime for the next bridge step.
+
 ## Exact Blocker Behavior
 
 When `mvsim_integration.mode` is set to `live_runtime` and the executable is missing:
@@ -213,8 +285,8 @@ This is intentional.
 
 ## What Still Remains After This Round
 
-- a real installed `mvsim` runtime on the PC
-- validated knowledge of which live pose output surface is best to bridge into sim-ingress on this machine
-- one true live-runtime end-to-end tour validation after the executable exists
+- selecting the narrowest live pose output surface from the running Linux-side MVSim process
+- bridging that output into the existing Windows-side sim-ingress path
+- one true live-runtime end-to-end tour validation through the existing tour stack
 
 This round intentionally stops before ROS formalization, simulator redesign, or map-format work.

@@ -973,7 +973,7 @@ Focused doc:
 
 ## MVSim Live Runtime Bring-Up Baseline
 
-This iteration makes the distinction between a real live MVSim runtime and the compatibility shim explicit, and it prepares a minimal repo-local world asset for future live bring-up without claiming success when the runtime is missing.
+This iteration now distinguishes the compatibility shim from a truthful Linux-side live MVSim runtime, and the repo-local minimal world has been updated to launch successfully against the current MVSim parser in Ubuntu/WSL2.
 
 What is included:
 - a live-runtime probe in `services/sim_publisher_bridge/mvsim_live.py`
@@ -989,42 +989,48 @@ python scripts/print_mvsim_live_probe.py --config configs/sim.yaml
 
 What the current sim config expresses:
 - `mvsim_integration.mode: compatibility_shim | live_runtime`
+- `mvsim_integration.runtime_host: windows | wsl`
 - `mvsim_integration.executable`
+- `mvsim_integration.wsl_distribution`
+- `mvsim_integration.wsl_executable_path`
 - `mvsim_integration.world_file`
 
 Current state on this PC:
 - the compatibility shim remains the validated path
-- the live runtime path stops in a blocker state because no real `mvsim` executable was found
-- the harness now shows that blocker clearly instead of pretending live validation passed
+- a real Linux-side `mvsim` runtime now exists in Ubuntu 24.04 on WSL2
+- the repo-local world launches in `--headless` mode from that WSL runtime
+- the harness can now show `live_runtime_available: true` even while the validated end-to-end sim path still uses the compatibility shim
 
-Retry-round environment findings on this Windows PC:
-- no `mvsim` or `mrpt` package was found via `winget` or `choco`
-- `wsl.exe --status` reported that WSL is not installed
-- direct `mvsim` source configure on Windows reached a real dependency blocker:
-  - `mrpt-maps` and related MRPT packages were not installed
-- MRPT source configure then hit a second blocker:
-  - required source dependencies were missing from the downloaded release zip path used during validation
-
-So the repo is now truthful about the next step:
-- the next live-runtime milestone is an environment enablement task, not a simulation-architecture task
+Linux-side enablement summary on this PC:
+- WSL2 and Ubuntu are installed and runnable
+- MRPT packages were installed from `ppa:joseluisblancoc/mrpt-stable`
+- MVSim was built from source in Ubuntu with:
+  - `git clone --recursive https://github.com/MRPT/mvsim.git /root/round033-mvsim-src`
+  - `cmake /root/round033-mvsim-src`
+  - `cmake --build . -j2`
+- the verified runtime command is:
+  - `/root/round033-mvsim-build/bin/mvsim --help`
 
 Current WSL-specific truth on this PC:
 - `wsl.exe` exists
-- WSL itself is not installed
-- the current shell is not elevated
-- repo probes now surface this explicitly as:
-  - `wsl_requires_elevation`
+- WSL itself is installed and Ubuntu is available
+- the validated live executable currently lives at:
+  - `/root/round033-mvsim-build/bin/mvsim`
+- `configs/sim.yaml` now records that WSL runtime path explicitly for probing and future bridge work
 
 Quick probe:
 ```shell
 python scripts/print_mvsim_live_probe.py --config configs/sim.yaml
 ```
 
-If you want to continue the WSL route, the next narrow environment step is:
+Headless world launch used in this round:
 ```text
-wsl.exe --install -d Ubuntu
+wsl.exe -d Ubuntu -u root -- bash -lc "/root/round033-mvsim-build/bin/mvsim launch /mnt/c/Users/saili/Desktop/odin_nav_stack_local_llm_docs/content/sim/mvsim/worlds/odin_minimal_tour.world.xml --headless -v INFO"
 ```
-Run that from an elevated Windows terminal, then continue Linux-side MVSim setup there.
+
+Next narrow step after this round:
+- inspect the live MVSim pose output surface from the running Linux process
+- bridge that output into the existing Windows-side sim-ingress path
 
 Focused doc:
 - `docs/MVSIM_LIVE_RUNTIME_BRINGUP.md`

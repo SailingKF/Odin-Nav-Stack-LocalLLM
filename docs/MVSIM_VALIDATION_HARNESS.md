@@ -79,6 +79,12 @@ The harness currently surfaces at least:
 - latest spot / latest narration
 - follow-up question result
 
+With the Round 033 WSL runtime update, the harness can now also truthfully show:
+
+- that a live MVSim runtime is available in WSL even while the validated end-to-end flow still uses `compatibility_shim`
+- which runtime host is configured for live MVSim bring-up
+- whether the repo-local world asset is already compatible with the current Linux-side MVSim parser
+
 ## How Common Problems Are Reported
 
 Current common operator failures are surfaced as:
@@ -109,4 +115,9 @@ This harness does not:
 - manage long-running packaged services
 - replace `/debug`
 
-It makes the current PC-side MVSim validation flow much easier for a human to inspect and it now also makes the live-runtime blocker explicit when `mvsim` is not available.
+It makes the current PC-side MVSim validation flow much easier for a human to inspect.
+It also distinguishes three truths cleanly:
+
+- compatibility shim works now
+- live runtime may already be available in WSL
+- the live pose bridge is still a separate next step

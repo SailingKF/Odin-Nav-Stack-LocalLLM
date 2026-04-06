@@ -55,7 +55,11 @@ isaac_source:
       - omni.isaac.core.utils.stage
 mvsim_integration:
   mode: compatibility_shim
+  runtime_host: wsl
   executable: mvsim
+  wsl_distribution: Ubuntu
+  wsl_user: root
+  wsl_executable_path: /root/round033-mvsim-build/bin/mvsim
   world_file: content/sim/mvsim/worlds/odin_minimal_tour.world.xml
   observation_file: content/sim/demo_mvsim_pose_stream.yaml
   assumed_frame_id: map

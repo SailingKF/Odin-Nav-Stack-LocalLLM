@@ -1,4 +1,5 @@
 import ctypes
+import shlex
 import subprocess
 import shutil
 from pathlib import Path
@@ -8,6 +9,15 @@ from typing import Any, Dict, List
 def resolve_repo_relative_path(path_value: str, repo_root: Path) -> Path:
     path = Path(path_value)
     return path if path.is_absolute() else repo_root / path
+
+
+def _to_wsl_path(path: Path) -> str:
+    text = str(path)
+    drive = path.drive.rstrip(":")
+    if drive:
+        relative = text[len(path.drive) :].replace("\\", "/")
+        return f"/mnt/{drive.lower()}{relative}"
+    return text.replace("\\", "/")
 
 
 def _decode_command_output(raw: bytes) -> str:
@@ -124,35 +134,101 @@ def probe_mvsim_live_runtime(config: Dict[str, Any], repo_root: Path) -> Dict[st
     mvsim_config = dict(config.get("mvsim_integration") or {})
     mode = str(mvsim_config.get("mode", "compatibility_shim"))
     executable = str(mvsim_config.get("executable", "mvsim"))
+    runtime_host = str(mvsim_config.get("runtime_host", "windows")).strip().lower() or "windows"
+    wsl_distribution = str(mvsim_config.get("wsl_distribution", "Ubuntu")).strip() or "Ubuntu"
+    wsl_user = str(mvsim_config.get("wsl_user", "root")).strip() or "root"
+    wsl_executable_path = str(mvsim_config.get("wsl_executable_path", "")).strip()
     world_file = str(mvsim_config.get("world_file", "")).strip()
     world_path = resolve_repo_relative_path(world_file, repo_root) if world_file else None
     world_exists = bool(world_path and world_path.exists())
     resolved_executable = shutil.which(executable)
-
-    blocker = None
-    if mode == "live_runtime":
-        if not resolved_executable:
-            blocker = {
-                "code": "mvsim_executable_not_found",
-                "detail": f"configured live MVSim executable '{executable}' was not found on this PC",
-            }
-        elif not world_exists:
-            blocker = {
-                "code": "mvsim_world_missing",
-                "detail": f"configured MVSim world file is missing: {world_path}",
-            }
-
+    wsl_enablement = probe_wsl_enablement()
+    runtime_check = None
     launch_command = None
-    if world_path:
-        launch_command = [resolved_executable or executable, "launch", str(world_path)]
+    blocker = None
+
+    if runtime_host == "wsl":
+        if not wsl_enablement.get("wsl_installed"):
+            blocker = {
+                "code": "wsl_not_ready",
+                "detail": "WSL runtime host was requested but WSL is not installed or not ready on this PC",
+            }
+        elif not wsl_executable_path:
+            blocker = {
+                "code": "wsl_mvsim_path_missing",
+                "detail": "WSL runtime host was requested but mvsim_integration.wsl_executable_path is empty",
+            }
+        else:
+            runtime_check = _run_command(
+                [
+                    "wsl.exe",
+                    "-d",
+                    wsl_distribution,
+                    "-u",
+                    wsl_user,
+                    "--",
+                    "bash",
+                    "-lc",
+                    f"test -x {shlex.quote(wsl_executable_path)}",
+                ]
+            )
+            if not runtime_check.get("ok") or runtime_check.get("returncode") != 0:
+                blocker = {
+                    "code": "wsl_mvsim_executable_not_found",
+                    "detail": (
+                        f"configured WSL MVSim executable '{wsl_executable_path}' "
+                        f"was not executable inside distribution '{wsl_distribution}'"
+                    ),
+                }
+            elif not world_exists:
+                blocker = {
+                    "code": "mvsim_world_missing",
+                    "detail": f"configured MVSim world file is missing: {world_path}",
+                }
+            elif world_path:
+                launch_command = [
+                    "wsl.exe",
+                    "-d",
+                    wsl_distribution,
+                    "-u",
+                    wsl_user,
+                    "--",
+                    "bash",
+                    "-lc",
+                    (
+                        f"{shlex.quote(wsl_executable_path)} launch "
+                        f"{shlex.quote(_to_wsl_path(world_path))}"
+                    ),
+                ]
+    else:
+        if mode == "live_runtime":
+            if not resolved_executable:
+                blocker = {
+                    "code": "mvsim_executable_not_found",
+                    "detail": f"configured live MVSim executable '{executable}' was not found on this PC",
+                }
+            elif not world_exists:
+                blocker = {
+                    "code": "mvsim_world_missing",
+                    "detail": f"configured MVSim world file is missing: {world_path}",
+                }
+
+        if world_path:
+            launch_command = [resolved_executable or executable, "launch", str(world_path)]
 
     return {
         "configured_mode": mode,
         "runtime_kind": "live_mvsim_runtime",
-        "runtime_available": bool(resolved_executable),
+        "runtime_host": runtime_host,
+        "runtime_available": False if blocker else bool(wsl_executable_path if runtime_host == "wsl" else resolved_executable),
         "executable": executable,
         "resolved_executable": resolved_executable,
+        "wsl_distribution": wsl_distribution if runtime_host == "wsl" else None,
+        "wsl_user": wsl_user if runtime_host == "wsl" else None,
+        "wsl_executable_path": wsl_executable_path if runtime_host == "wsl" else None,
+        "runtime_check": runtime_check,
         "world_file": str(world_path) if world_path else None,
+        "world_file_wsl": _to_wsl_path(world_path) if runtime_host == "wsl" and world_path else None,
         "world_file_exists": world_exists,
         "launch_command": launch_command,
         "vehicle_name": mvsim_config.get("vehicle_name"),
