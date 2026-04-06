@@ -90,6 +90,10 @@ class MVSimLiveRuntimeTests(unittest.TestCase):
             "wsl_topic_echo_to_http_ingress",
         )
         self.assertEqual(
+            probe["live_validation_alignment"]["strategy"],
+            None,
+        )
+        self.assertEqual(
             probe["launch_command"][:7],
             ["wsl.exe", "-d", "Ubuntu", "-u", "root", "--", "bash"],
         )
@@ -119,6 +123,45 @@ class MVSimLiveRuntimeTests(unittest.TestCase):
         self.assertEqual(summary["compatibility_source"]["source_kind"], "mvsim_compatibility_shim")
         self.assertTrue(summary["compatibility_source"]["observation_file_exists"])
         self.assertIn("wsl_enablement", summary)
+
+    @patch("services.sim_publisher_bridge.mvsim_live._run_command")
+    @patch("services.sim_publisher_bridge.mvsim_live.probe_wsl_enablement")
+    def test_probe_surfaces_live_alignment_strategy(
+        self, mock_probe_wsl_enablement, mock_run_command
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        config = {
+            "mvsim_integration": {
+                "mode": "compatibility_shim",
+                "runtime_host": "wsl",
+                "wsl_distribution": "Ubuntu",
+                "wsl_user": "root",
+                "wsl_executable_path": "/root/round033-mvsim-build/bin/mvsim",
+                "world_file": "content/sim/mvsim/worlds/odin_minimal_tour.world.xml",
+                "live_validation_alignment": {
+                    "strategy": "world_init_pose_matches_first_route_poi",
+                    "target_spot_id": "gate",
+                    "target_spot_name": "East Gate",
+                    "target_x": 0.0,
+                    "target_y": 0.0,
+                    "expected_outcome": "first_live_poi_hit_and_narration",
+                },
+            }
+        }
+        mock_probe_wsl_enablement.return_value = {"wsl_installed": True, "blocker": None}
+        mock_run_command.return_value = {"ok": True, "returncode": 0, "stdout": "", "stderr": ""}
+
+        probe = probe_mvsim_live_runtime(config, repo_root)
+
+        self.assertEqual(
+            probe["live_validation_alignment"]["strategy"],
+            "world_init_pose_matches_first_route_poi",
+        )
+        self.assertEqual(probe["live_validation_alignment"]["target_spot_id"], "gate")
+        self.assertEqual(
+            probe["live_validation_alignment"]["expected_outcome"],
+            "first_live_poi_hit_and_narration",
+        )
 
 
 if __name__ == "__main__":

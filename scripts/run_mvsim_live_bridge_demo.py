@@ -14,7 +14,7 @@ if str(REPO_ROOT) not in sys.path:
 from adapters.sim.frame_transform import SimFrameTransformConfig
 from adapters.sim.projection import SimPoseProjectionConfig
 from services.sim_publisher_bridge.http_client import SimIngressHttpClient
-from services.sim_publisher_bridge.mvsim_live import probe_mvsim_live_runtime
+from services.sim_publisher_bridge.mvsim_live import probe_mvsim_live_runtime, summarize_live_bridge_result
 from services.sim_publisher_bridge.mvsim_live_source import (
     WslMVSimTopicEchoSource,
     describe_mvsim_live_pose_source,
@@ -157,6 +157,13 @@ def main() -> int:
             "latest_session",
         ):
             print(json.dumps({key: result[key]}, ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                {"live_validation_summary": summarize_live_bridge_result(probe, result)},
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         return 0
     finally:
         if runtime_process is not None:

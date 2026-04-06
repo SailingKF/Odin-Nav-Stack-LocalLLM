@@ -91,6 +91,12 @@ Start sim ingress on Windows:
 python scripts/run_sim_pose_ingress_server.py --config configs/sim.yaml --host 127.0.0.1 --port 8100
 ```
 
+Optional API proxy for `/debug` observation:
+
+```text
+python scripts/run_api_server.py --config configs/sim.yaml --host 127.0.0.1 --port 8000
+```
+
 Then run the live bridge demo:
 
 ```text
@@ -103,36 +109,49 @@ The demo script:
 - subscribes to `/tour_bot/pose`
 - relays a small batch of live samples into `sim_pose_ingress`
 - prints payload samples plus resulting ingress/session state
+- prints a `live_validation_summary` block with:
+  - live pose relay status
+  - whether a live POI hit occurred
+  - whether a live narration event occurred
+  - which spot was validated
+  - the configured alignment strategy
 
 ## What Was Truthfully Validated
 
-Round 034 validated at least this end-to-end fact:
+Round 035 validates these end-to-end facts:
 
 - a real live `mvsim_msgs.TimeStampedPose` sample from the WSL MVSim runtime reached the current `sim_pose_ingress` path
+- that live pose truthfully hit the first current POI
+- that hit truthfully produced a live-triggered narration event
 
 Observed live pose sample:
 
-- `x = -3.0`
-- `y = -1.5`
+- `x = 0.0`
+- `y = 0.0`
 - `label = "tour_bot"`
 
 Observed downstream fact in the current Windows-side runtime:
 
 - `state.last_pose` became the relayed live pose sample
-- the current route target remained:
-  - `active_spot_name = "East Gate"`
+- `latest_session.latest_narration_text` became the generated `East Gate` narration
+- `latest_session.latest_audio_playback.spot_name` became `East Gate`
+- after the live hit, the next current route target became:
+  - `active_spot_name = "Central Plaza"`
+
+Chosen alignment strategy:
+
+- keep the current demo POI content unchanged
+- keep the current live bridge transport unchanged
+- align the minimal repo-local MVSim world init pose to the first current POI
+- record that choice in `configs/sim.yaml` under:
+  - `mvsim_integration.live_validation_alignment`
 
 What this does **not** prove yet:
 
-- a live-driven POI trigger
-- live-driven narration progression
+- natural multi-POI live progression from continuous simulator motion
+- full live route completion
 
-Reason:
-
-- the current repo-local MVSim world starts the robot at `(-3.0, -1.5)`
-- the current demo POI content places `East Gate` at `(0.0, 0.0)`
-
-So this baseline proves truthful cross-boundary live pose relay, but not yet live route completion.
+So this baseline now proves truthful cross-boundary live pose relay, a truthful first live POI hit, and a truthful first live-triggered narration event.
 
 ## Scope Limits
 

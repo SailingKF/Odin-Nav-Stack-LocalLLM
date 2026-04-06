@@ -24,8 +24,9 @@
 
   <include file="../definitions/odin_tour_bot.vehicle.xml" />
 
+  <!-- Round 035 baseline: align the minimal live-runtime start pose with the first current POI. -->
   <vehicle name="tour_bot" class="odin_tour_bot">
-    <init_pose>-3.0 -1.5 0.0</init_pose>
+    <init_pose>0.0 0.0 0.0</init_pose>
     <publish>
       <publish_pose_topic>/tour_bot/pose</publish_pose_topic>
       <publish_pose_period>0.10</publish_pose_period>

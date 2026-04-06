@@ -109,6 +109,8 @@
         ["Shell Elevated", payload.mvsim_mode_summary && payload.mvsim_mode_summary.wsl_enablement ? payload.mvsim_mode_summary.wsl_enablement.current_shell_elevated : null, payload.mvsim_mode_summary && payload.mvsim_mode_summary.wsl_enablement && payload.mvsim_mode_summary.wsl_enablement.current_shell_elevated ? "ok" : "warn"],
         ["Live Pose Topic", payload.mvsim_mode_summary && payload.mvsim_mode_summary.live_runtime && payload.mvsim_mode_summary.live_runtime.live_pose_surface ? payload.mvsim_mode_summary.live_runtime.live_pose_surface.topic_name : null],
         ["Live Bridge Mode", payload.mvsim_mode_summary && payload.mvsim_mode_summary.live_runtime && payload.mvsim_mode_summary.live_runtime.live_pose_surface ? payload.mvsim_mode_summary.live_runtime.live_pose_surface.bridge_mode : null],
+        ["Live Alignment Strategy", payload.mvsim_mode_summary && payload.mvsim_mode_summary.live_runtime && payload.mvsim_mode_summary.live_runtime.live_validation_alignment ? payload.mvsim_mode_summary.live_runtime.live_validation_alignment.strategy : null],
+        ["Expected First Live POI", payload.mvsim_mode_summary && payload.mvsim_mode_summary.live_runtime && payload.mvsim_mode_summary.live_runtime.live_validation_alignment ? payload.mvsim_mode_summary.live_runtime.live_validation_alignment.target_spot_name : null],
         ["Overall Status", snapshot.overall_status || "idle", snapshot.overall_status==="passed" ? "ok" : snapshot.overall_status==="failed" ? "fail" : "warn"],
         ["Route Completed", snapshot.route_completed, snapshot.route_completed ? "ok" : "warn"],
         ["Latest Session", snapshot.latest_session_id],

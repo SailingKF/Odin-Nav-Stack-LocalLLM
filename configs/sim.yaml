@@ -63,6 +63,13 @@ mvsim_integration:
   live_pose_topic: /tour_bot/pose
   live_pose_message_type: mvsim_msgs.TimeStampedPose
   live_bridge_mode: wsl_topic_echo_to_http_ingress
+  live_validation_alignment:
+    strategy: world_init_pose_matches_first_route_poi
+    target_spot_id: gate
+    target_spot_name: East Gate
+    target_x: 0.0
+    target_y: 0.0
+    expected_outcome: first_live_poi_hit_and_narration
   world_file: content/sim/mvsim/worlds/odin_minimal_tour.world.xml
   observation_file: content/sim/demo_mvsim_pose_stream.yaml
   assumed_frame_id: map

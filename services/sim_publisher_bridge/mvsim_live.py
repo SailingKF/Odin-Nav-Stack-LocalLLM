@@ -31,6 +31,18 @@ def _decode_command_output(raw: bytes) -> str:
     return raw.decode("utf-8", errors="replace")
 
 
+def _build_live_validation_alignment(mvsim_config: Dict[str, Any]) -> Dict[str, Any]:
+    alignment = dict(mvsim_config.get("live_validation_alignment") or {})
+    return {
+        "strategy": alignment.get("strategy"),
+        "target_spot_id": alignment.get("target_spot_id"),
+        "target_spot_name": alignment.get("target_spot_name"),
+        "target_x": alignment.get("target_x"),
+        "target_y": alignment.get("target_y"),
+        "expected_outcome": alignment.get("expected_outcome"),
+    }
+
+
 def _run_command(command: List[str], timeout_sec: float = 15.0) -> Dict[str, Any]:
     try:
         completed = subprocess.run(
@@ -148,6 +160,7 @@ def probe_mvsim_live_runtime(config: Dict[str, Any], repo_root: Path) -> Dict[st
     live_bridge_mode = str(
         mvsim_config.get("live_bridge_mode", "wsl_topic_echo_to_http_ingress")
     ).strip() or "wsl_topic_echo_to_http_ingress"
+    live_validation_alignment = _build_live_validation_alignment(mvsim_config)
     resolved_executable = shutil.which(executable)
     wsl_enablement = probe_wsl_enablement()
     runtime_check = None
@@ -246,7 +259,45 @@ def probe_mvsim_live_runtime(config: Dict[str, Any], repo_root: Path) -> Dict[st
             "message_type": live_pose_message_type,
             "bridge_mode": live_bridge_mode,
         },
+        "live_validation_alignment": live_validation_alignment,
         "blocker": blocker,
+    }
+
+
+def summarize_live_bridge_result(probe: Dict[str, Any], bridge_result: Dict[str, Any]) -> Dict[str, Any]:
+    final_state = dict(bridge_result.get("final_state") or {})
+    latest_session = dict(bridge_result.get("latest_session") or {})
+    latest_audio_playback = dict(latest_session.get("latest_audio_playback") or {})
+    alignment = dict(probe.get("live_validation_alignment") or {})
+    validated_spot_id = (
+        latest_audio_playback.get("spot_id")
+        or latest_session.get("latest_spot_id")
+        or final_state.get("active_spot_id")
+    )
+    validated_spot_name = (
+        latest_audio_playback.get("spot_name")
+        or latest_session.get("latest_spot_name")
+        or final_state.get("active_spot_name")
+    )
+    validated_narration_text = latest_session.get("latest_narration_text") or final_state.get("last_narration_text")
+    last_pose = final_state.get("last_pose") or latest_session.get("latest_pose")
+    expected_spot_id = alignment.get("target_spot_id")
+
+    return {
+        "live_pose_reached_stack": bool(last_pose),
+        "live_poi_hit_occurred": bool(validated_spot_id or validated_spot_name or validated_narration_text),
+        "live_narration_occurred": bool(validated_narration_text),
+        "validated_spot_id": validated_spot_id,
+        "validated_spot_name": validated_spot_name,
+        "validated_narration_text": validated_narration_text,
+        "last_pose": last_pose,
+        "route_completed": bool(final_state.get("route_completed")),
+        "latest_event_type": latest_session.get("latest_event_type") or final_state.get("last_event_type"),
+        "expected_first_spot_id": expected_spot_id,
+        "expected_first_spot_name": alignment.get("target_spot_name"),
+        "alignment_strategy": alignment.get("strategy"),
+        "expected_outcome": alignment.get("expected_outcome"),
+        "matches_expected_first_spot": bool(expected_spot_id and validated_spot_id == expected_spot_id),
     }
 
 

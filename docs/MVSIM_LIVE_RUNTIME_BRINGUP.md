@@ -54,6 +54,13 @@ The minimal world is intentionally simple:
 - no ROS dependence
 - no sensor simulation requirement
 
+Current live-validation alignment note:
+
+- for the Round 035 baseline, the world init pose is intentionally aligned to the first current POI
+- this keeps the change narrow while proving the first live-triggered narration event
+- the chosen alignment is recorded in `configs/sim.yaml` under:
+  - `mvsim_integration.live_validation_alignment`
+
 Files:
 
 - `content/sim/mvsim/definitions/odin_tour_bot.vehicle.xml`
@@ -302,6 +309,26 @@ Focused bridge doc:
 
 - `docs/MVSIM_LIVE_POSE_BRIDGE.md`
 
+## Round 035 Live Route Alignment And First Narration Trigger
+
+The next narrow step was to close the first product-level event boundary instead of stopping at `last_pose` updates.
+
+Chosen alignment strategy:
+
+- keep the current `demo_pois.yaml` content unchanged
+- keep the current live bridge path unchanged
+- move only the repo-local MVSim world init pose to the first current POI:
+  - `East Gate` at `(0.0, 0.0)`
+
+What this enables truthfully:
+
+- the first live `/tour_bot/pose` sample lands inside the first POI trigger radius
+- `sim_pose_ingress` records a real `poi_triggered`
+- the existing orchestrator records a real `narration_started`
+- `/debug` can observe the resulting narration through the sim-profile API proxy
+
+This remains a narrow validation asset choice, not a claim of full live autonomous progression.
+
 ## Exact Blocker Behavior
 
 When `mvsim_integration.mode` is set to `live_runtime` and the executable is missing:
@@ -317,8 +344,8 @@ This is intentional.
 
 ## What Still Remains After This Round
 
-- selecting the narrowest live pose output surface from the running Linux-side MVSim process
-- bridging that output into the existing Windows-side sim-ingress path
-- one true live-runtime end-to-end tour validation through the existing tour stack
+- moving beyond the first live POI hit into truthful continuous live route progression
+- deciding whether the minimal MVSim world should gain controlled motion or stay a first-hit-only validation asset
+- validating a second live POI hit only if that can be done without simulator redesign
 
 This round intentionally stops before ROS formalization, simulator redesign, or map-format work.

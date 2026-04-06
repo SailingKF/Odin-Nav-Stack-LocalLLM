@@ -1049,12 +1049,21 @@ Round 034 live pose discovery and bridge baseline:
 How to run the current minimal live bridge:
 ```shell
 python scripts/run_sim_pose_ingress_server.py --config configs/sim.yaml --host 127.0.0.1 --port 8100
+python scripts/run_api_server.py --config configs/sim.yaml --host 127.0.0.1 --port 8000
 python scripts/run_mvsim_live_bridge_demo.py --config configs/sim.yaml --base-url http://127.0.0.1:8100
 ```
 
 The current `sim.yaml` now records:
 - `mvsim_integration.live_pose_topic: /tour_bot/pose`
 - `mvsim_integration.live_bridge_mode: wsl_topic_echo_to_http_ingress`
+- `mvsim_integration.live_validation_alignment.strategy: world_init_pose_matches_first_route_poi`
+- `mvsim_integration.live_validation_alignment.target_spot_name: East Gate`
+
+Round 035 live first-narration baseline:
+- the repo-local MVSim world init pose is now explicitly aligned to the first current POI
+- this is a narrow validation choice for proving the first live POI hit and first live-triggered narration event
+- the live bridge demo now prints a `live_validation_summary`
+- after running the live bridge, `/debug` on `http://127.0.0.1:8000/debug` can show the resulting narration text from the existing Windows-side stack
 
 Focused docs:
 - `docs/MVSIM_LIVE_RUNTIME_BRINGUP.md`

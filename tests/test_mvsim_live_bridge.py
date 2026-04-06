@@ -9,6 +9,7 @@ from adapters.sim.projection import SimPoseProjectionConfig
 from services.sim_pose_ingress.app import create_app as create_sim_app
 from services.sim_pose_ingress.runtime import SimPoseIngressRuntime
 from services.sim_publisher_bridge.http_client import SimIngressHttpClient
+from services.sim_publisher_bridge.mvsim_live import summarize_live_bridge_result
 from services.sim_publisher_bridge.mvsim_live_source import (
     describe_mvsim_live_pose_source,
     parse_time_stamped_pose_blocks,
@@ -152,6 +153,39 @@ class MVSimLiveBridgeTests(unittest.TestCase):
         self.assertEqual(descriptor["source_kind"], "mvsim_live_topic_echo")
         self.assertEqual(descriptor["topic_name"], "/tour_bot/pose")
         self.assertEqual(descriptor["message_type"], "mvsim_msgs.TimeStampedPose")
+
+    def test_live_bridge_summary_reports_first_narration(self) -> None:
+        summary = summarize_live_bridge_result(
+            probe={
+                "live_validation_alignment": {
+                    "strategy": "world_init_pose_matches_first_route_poi",
+                    "target_spot_id": "gate",
+                    "target_spot_name": "East Gate",
+                    "expected_outcome": "first_live_poi_hit_and_narration",
+                }
+            },
+            bridge_result={
+                "final_state": {
+                    "last_pose": {"x": 0.0, "y": 0.0, "label": "tour_bot"},
+                    "last_event_type": "state_transition",
+                    "route_completed": False,
+                },
+                "latest_session": {
+                    "latest_event_type": "session_finished",
+                    "latest_narration_text": "Welcome to the East Gate.",
+                    "latest_audio_playback": {
+                        "spot_id": "gate",
+                        "spot_name": "East Gate",
+                    },
+                },
+            },
+        )
+
+        self.assertTrue(summary["live_pose_reached_stack"])
+        self.assertTrue(summary["live_poi_hit_occurred"])
+        self.assertTrue(summary["live_narration_occurred"])
+        self.assertEqual(summary["validated_spot_id"], "gate")
+        self.assertTrue(summary["matches_expected_first_spot"])
 
 
 if __name__ == "__main__":
