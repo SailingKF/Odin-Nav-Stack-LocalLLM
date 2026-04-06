@@ -997,6 +997,17 @@ Current state on this PC:
 - the live runtime path stops in a blocker state because no real `mvsim` executable was found
 - the harness now shows that blocker clearly instead of pretending live validation passed
 
+Retry-round environment findings on this Windows PC:
+- no `mvsim` or `mrpt` package was found via `winget` or `choco`
+- `wsl.exe --status` reported that WSL is not installed
+- direct `mvsim` source configure on Windows reached a real dependency blocker:
+  - `mrpt-maps` and related MRPT packages were not installed
+- MRPT source configure then hit a second blocker:
+  - required source dependencies were missing from the downloaded release zip path used during validation
+
+So the repo is now truthful about the next step:
+- the next live-runtime milestone is an environment enablement task, not a simulation-architecture task
+
 Focused doc:
 - `docs/MVSIM_LIVE_RUNTIME_BRINGUP.md`
 

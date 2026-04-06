@@ -103,6 +103,62 @@ On this PC, the live-runtime blocker is:
 
 Therefore this round stops in a real blocker state for live mode instead of faking a live end-to-end run.
 
+## Round 031 Retry Findings
+
+The retry round pushed the environment blocker further and made the installation path more concrete.
+
+### Runtime discovery findings on this PC
+
+- `where.exe mvsim`
+  - returned no executable
+- `winget search mvsim`
+  - no package found
+- `winget search mrpt`
+  - no package found
+- `choco search mvsim --exact`
+  - no package found
+- `choco search mrpt`
+  - no package found
+- `wsl.exe --status`
+  - reported that WSL is not installed on this PC
+
+### Source-build findings on this PC
+
+What is available:
+
+- `git`
+- `cmake`
+- Visual Studio Community 2022
+- MSVC toolchain through `VsDevCmd.bat`
+
+What failed:
+
+- direct `git clone` of `https://github.com/MRPT/mvsim.git`
+  - failed with network resets / connect failures to GitHub over git HTTPS
+- configuring `mvsim` from a downloaded source zip
+  - failed because `mrpt-maps` and related MRPT packages were not installed
+- configuring MRPT from its release source zip
+  - progressed further, but failed because the source release did not contain required submodule content such as the embedded `glfw` / `nanoflann` sources expected by that build path
+
+### What this means
+
+The blocker is now more precise than “runtime missing”.
+
+Current real blocker chain is:
+
+1. no packaged `mvsim` runtime is available on this Windows PC via the package managers we checked
+2. WSL is not installed, so the practical Linux path is not immediately available
+3. source-build fallback is currently blocked by:
+   - missing MRPT install
+   - GitHub git transport instability for recursive source retrieval
+   - incomplete dependency content in downloaded source zips for a clean Windows-from-source path
+
+So the next enablement step is not a repo refactor.
+It is an environment step:
+
+- either install WSL and use the Linux MVSim/MRPT path
+- or establish a reliable Windows source-build workflow with full git/submodule access and MRPT built first
+
 ## Exact Blocker Behavior
 
 When `mvsim_integration.mode` is set to `live_runtime` and the executable is missing:
