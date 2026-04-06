@@ -80,6 +80,7 @@ The harness currently surfaces at least:
 - follow-up question result
 - the configured live alignment strategy
 - the expected first live POI for the current repo-local MVSim validation asset
+- the expected second live POI for the current repo-local MVSim validation asset
 
 With the Round 033 WSL runtime update, the harness can now also truthfully show:
 

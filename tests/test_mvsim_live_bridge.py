@@ -158,25 +158,32 @@ class MVSimLiveBridgeTests(unittest.TestCase):
         summary = summarize_live_bridge_result(
             probe={
                 "live_validation_alignment": {
-                    "strategy": "world_init_pose_matches_first_route_poi",
+                    "strategy": "isolated_live_validation_world_with_forward_motion",
+                    "motion_strategy": "constant_forward_velocity_along_demo_axis",
                     "target_spot_id": "gate",
                     "target_spot_name": "East Gate",
-                    "expected_outcome": "first_live_poi_hit_and_narration",
+                    "second_target_spot_id": "plaza",
+                    "second_target_spot_name": "Central Plaza",
+                    "expected_outcome": "second_live_poi_hit_and_second_narration",
                 }
             },
             bridge_result={
                 "final_state": {
-                    "last_pose": {"x": 0.0, "y": 0.0, "label": "tour_bot"},
+                    "last_pose": {"x": 5.0, "y": 0.0, "label": "tour_bot"},
                     "last_event_type": "state_transition",
                     "route_completed": False,
                 },
                 "latest_session": {
                     "latest_event_type": "session_finished",
-                    "latest_narration_text": "Welcome to the East Gate.",
+                    "latest_narration_text": "This central plaza is the mid-route checkpoint in the demo tour.",
                     "latest_audio_playback": {
-                        "spot_id": "gate",
-                        "spot_name": "East Gate",
+                        "spot_id": "plaza",
+                        "spot_name": "Central Plaza",
                     },
+                    "recent_narrations": [
+                        {"spot_id": "gate", "spot_name": "East Gate", "text": "Welcome to the East Gate."},
+                        {"spot_id": "plaza", "spot_name": "Central Plaza", "text": "This central plaza is the mid-route checkpoint in the demo tour."},
+                    ],
                 },
             },
         )
@@ -184,8 +191,11 @@ class MVSimLiveBridgeTests(unittest.TestCase):
         self.assertTrue(summary["live_pose_reached_stack"])
         self.assertTrue(summary["live_poi_hit_occurred"])
         self.assertTrue(summary["live_narration_occurred"])
-        self.assertEqual(summary["validated_spot_id"], "gate")
+        self.assertTrue(summary["live_second_poi_hit_occurred"])
+        self.assertTrue(summary["live_second_narration_occurred"])
+        self.assertEqual(summary["validated_spot_id"], "plaza")
         self.assertTrue(summary["matches_expected_first_spot"])
+        self.assertTrue(summary["matches_expected_second_spot"])
 
 
 if __name__ == "__main__":

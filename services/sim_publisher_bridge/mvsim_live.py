@@ -35,10 +35,15 @@ def _build_live_validation_alignment(mvsim_config: Dict[str, Any]) -> Dict[str, 
     alignment = dict(mvsim_config.get("live_validation_alignment") or {})
     return {
         "strategy": alignment.get("strategy"),
+        "motion_strategy": alignment.get("motion_strategy"),
         "target_spot_id": alignment.get("target_spot_id"),
         "target_spot_name": alignment.get("target_spot_name"),
         "target_x": alignment.get("target_x"),
         "target_y": alignment.get("target_y"),
+        "second_target_spot_id": alignment.get("second_target_spot_id"),
+        "second_target_spot_name": alignment.get("second_target_spot_name"),
+        "second_target_x": alignment.get("second_target_x"),
+        "second_target_y": alignment.get("second_target_y"),
         "expected_outcome": alignment.get("expected_outcome"),
     }
 
@@ -269,35 +274,53 @@ def summarize_live_bridge_result(probe: Dict[str, Any], bridge_result: Dict[str,
     latest_session = dict(bridge_result.get("latest_session") or {})
     latest_audio_playback = dict(latest_session.get("latest_audio_playback") or {})
     alignment = dict(probe.get("live_validation_alignment") or {})
+    recent_poi_triggers = list(latest_session.get("recent_poi_triggers") or [])
     validated_spot_id = (
         latest_audio_playback.get("spot_id")
-        or latest_session.get("latest_spot_id")
-        or final_state.get("active_spot_id")
+        or latest_session.get("latest_narrated_spot_id")
+        or latest_session.get("latest_triggered_spot_id")
     )
     validated_spot_name = (
         latest_audio_playback.get("spot_name")
-        or latest_session.get("latest_spot_name")
-        or final_state.get("active_spot_name")
+        or latest_session.get("latest_narrated_spot_name")
+        or latest_session.get("latest_triggered_spot_name")
     )
     validated_narration_text = latest_session.get("latest_narration_text") or final_state.get("last_narration_text")
     last_pose = final_state.get("last_pose") or latest_session.get("latest_pose")
     expected_spot_id = alignment.get("target_spot_id")
+    second_expected_spot_id = alignment.get("second_target_spot_id")
+    recent_narrations = list(latest_session.get("recent_narrations") or [])
+    narrated_spot_ids = [item.get("spot_id") for item in recent_narrations if item.get("spot_id")]
+    narrated_spot_names = [item.get("spot_name") for item in recent_narrations if item.get("spot_name")]
+    triggered_spot_ids = [item.get("spot_id") for item in recent_poi_triggers if item.get("spot_id")]
+    triggered_spot_names = [item.get("spot_name") for item in recent_poi_triggers if item.get("spot_name")]
 
     return {
         "live_pose_reached_stack": bool(last_pose),
-        "live_poi_hit_occurred": bool(validated_spot_id or validated_spot_name or validated_narration_text),
+        "live_poi_hit_occurred": bool(triggered_spot_ids or validated_spot_id or validated_spot_name),
         "live_narration_occurred": bool(validated_narration_text),
+        "live_first_poi_hit_occurred": bool(expected_spot_id and (expected_spot_id in triggered_spot_ids or expected_spot_id in narrated_spot_ids or validated_spot_id == expected_spot_id)),
+        "live_second_poi_hit_occurred": bool(second_expected_spot_id and (second_expected_spot_id in triggered_spot_ids or second_expected_spot_id in narrated_spot_ids)),
+        "live_second_narration_occurred": bool(second_expected_spot_id and second_expected_spot_id in narrated_spot_ids),
         "validated_spot_id": validated_spot_id,
         "validated_spot_name": validated_spot_name,
         "validated_narration_text": validated_narration_text,
+        "recent_triggered_spot_ids": triggered_spot_ids,
+        "recent_triggered_spot_names": triggered_spot_names,
+        "recent_narrated_spot_ids": narrated_spot_ids,
+        "recent_narrated_spot_names": narrated_spot_names,
         "last_pose": last_pose,
         "route_completed": bool(final_state.get("route_completed")),
         "latest_event_type": latest_session.get("latest_event_type") or final_state.get("last_event_type"),
         "expected_first_spot_id": expected_spot_id,
         "expected_first_spot_name": alignment.get("target_spot_name"),
+        "expected_second_spot_id": second_expected_spot_id,
+        "expected_second_spot_name": alignment.get("second_target_spot_name"),
         "alignment_strategy": alignment.get("strategy"),
+        "motion_strategy": alignment.get("motion_strategy"),
         "expected_outcome": alignment.get("expected_outcome"),
-        "matches_expected_first_spot": bool(expected_spot_id and validated_spot_id == expected_spot_id),
+        "matches_expected_first_spot": bool(expected_spot_id and (expected_spot_id in triggered_spot_ids or expected_spot_id in narrated_spot_ids or validated_spot_id == expected_spot_id)),
+        "matches_expected_second_spot": bool(second_expected_spot_id and (second_expected_spot_id in triggered_spot_ids or second_expected_spot_id in narrated_spot_ids)),
     }
 
 

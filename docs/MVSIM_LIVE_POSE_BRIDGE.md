@@ -111,47 +111,64 @@ The demo script:
 - prints payload samples plus resulting ingress/session state
 - prints a `live_validation_summary` block with:
   - live pose relay status
-  - whether a live POI hit occurred
-  - whether a live narration event occurred
-  - which spot was validated
-  - the configured alignment strategy
+  - whether a live first POI hit occurred
+  - whether a live second POI hit occurred
+  - whether a live second narration event occurred
+  - whether route completion occurred
+  - which recent triggered/narrated spots were actually observed
+  - the configured alignment and motion strategy
 
 ## What Was Truthfully Validated
 
-Round 035 validates these end-to-end facts:
+Round 036 validates these end-to-end facts:
 
 - a real live `mvsim_msgs.TimeStampedPose` sample from the WSL MVSim runtime reached the current `sim_pose_ingress` path
-- that live pose truthfully hit the first current POI
-- that hit truthfully produced a live-triggered narration event
+- that live pose truthfully hit:
+  - `East Gate`
+  - `Central Plaza`
+  - `History Gallery`
+- the existing Windows-side tour runtime truthfully produced live-triggered narration events for all three stops
+- the current route truthfully completed in the existing stack
 
 Observed live pose sample:
 
-- `x = 0.0`
-- `y = 0.0`
+- `x = 9.075166702270508`
+- `y = 0.5`
 - `label = "tour_bot"`
 
 Observed downstream fact in the current Windows-side runtime:
 
-- `state.last_pose` became the relayed live pose sample
-- `latest_session.latest_narration_text` became the generated `East Gate` narration
-- `latest_session.latest_audio_playback.spot_name` became `East Gate`
-- after the live hit, the next current route target became:
-  - `active_spot_name = "Central Plaza"`
+- `api_state.route_completed = true`
+- `api_state.current_index = 3`
+- `api_latest_session.recent_poi_triggers` recorded:
+  - `gate`
+  - `plaza`
+  - `gallery`
+- `api_latest_session.recent_narrations` recorded:
+  - `East Gate`
+  - `Central Plaza`
+  - `History Gallery`
+- `latest_session.latest_narration_text` became the generated `History Gallery` narration
 
 Chosen alignment strategy:
 
 - keep the current demo POI content unchanged
 - keep the current live bridge transport unchanged
-- align the minimal repo-local MVSim world init pose to the first current POI
+- use an explicit isolated live-validation world:
+  - `content/sim/mvsim/worlds/odin_live_multistop_tour.world.xml`
+- use an explicit live-validation vehicle:
+  - `content/sim/mvsim/definitions/odin_tour_bot_live_progress.vehicle.xml`
+- move the live path off the tangential `y=0` line and onto a stable `y=0.5` progression lane
+- remove the one internal blocking wall segment that stopped the robot near `x≈2.11`
 - record that choice in `configs/sim.yaml` under:
   - `mvsim_integration.live_validation_alignment`
 
 What this does **not** prove yet:
 
-- natural multi-POI live progression from continuous simulator motion
-- full live route completion
+- autonomous path planning
+- general-purpose world/layout robustness beyond this explicit validation asset
 
-So this baseline now proves truthful cross-boundary live pose relay, a truthful first live POI hit, and a truthful first live-triggered narration event.
+So this baseline now proves truthful cross-boundary live pose relay, truthful multi-stop live POI hits, truthful live narration across those stops, and truthful route completion for this isolated live-validation asset.
 
 ## Scope Limits
 

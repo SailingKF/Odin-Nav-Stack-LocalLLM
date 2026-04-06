@@ -28,6 +28,34 @@ def _build_recent_audio_events(events: List[Dict[str, Any]], limit: int = 5) -> 
     ][-limit:]
 
 
+def _build_recent_narrations(events: List[Dict[str, Any]], limit: int = 5) -> List[Dict[str, Any]]:
+    return [
+        {
+            "timestamp": item.get("timestamp"),
+            "spot_id": item.get("spot_id"),
+            "spot_name": item.get("spot_name"),
+            "text": item.get("narration_text"),
+            "state": item.get("state"),
+            "mode": dict(item.get("extra") or {}).get("mode"),
+        }
+        for item in events
+        if item.get("event_type") == "narration_started" and item.get("narration_text")
+    ][-limit:]
+
+
+def _build_recent_poi_triggers(events: List[Dict[str, Any]], limit: int = 5) -> List[Dict[str, Any]]:
+    return [
+        {
+            "timestamp": item.get("timestamp"),
+            "spot_id": item.get("spot_id"),
+            "spot_name": item.get("spot_name"),
+            "state": item.get("state"),
+        }
+        for item in events
+        if item.get("event_type") == "poi_triggered" and item.get("spot_id")
+    ][-limit:]
+
+
 def build_audio_summary_from_latest_audio_playback(
     latest_audio_playback: Optional[Dict[str, Any]],
     completion_event: Optional[Dict[str, Any]] = None,
@@ -118,6 +146,8 @@ class JsonlSessionStore(SessionStore):
         self._latest_answer_text: Optional[str] = None
         self._latest_audio_playback: Optional[Dict[str, Any]] = None
         self._recent_audio_events: List[Dict[str, Any]] = []
+        self._recent_narrations: List[Dict[str, Any]] = []
+        self._recent_poi_triggers: List[Dict[str, Any]] = []
         self._closed = True
 
     @property
@@ -156,6 +186,8 @@ class JsonlSessionStore(SessionStore):
         self._latest_answer_text = None
         self._latest_audio_playback = None
         self._recent_audio_events = []
+        self._recent_narrations = []
+        self._recent_poi_triggers = []
         self._closed = False
         self.append_event("session_started", state="IDLE", extra=metadata or {})
         return self._session_id
@@ -191,6 +223,27 @@ class JsonlSessionStore(SessionStore):
         self._latest_event = payload
         if event_type == "narration_started" and narration_text:
             self._latest_narration_text = narration_text
+            self._recent_narrations.append(
+                {
+                    "timestamp": payload.get("timestamp"),
+                    "spot_id": payload.get("spot_id"),
+                    "spot_name": payload.get("spot_name"),
+                    "text": narration_text,
+                    "state": payload.get("state"),
+                    "mode": dict(payload.get("extra") or {}).get("mode"),
+                }
+            )
+            self._recent_narrations = self._recent_narrations[-5:]
+        if event_type == "poi_triggered" and payload.get("spot_id"):
+            self._recent_poi_triggers.append(
+                {
+                    "timestamp": payload.get("timestamp"),
+                    "spot_id": payload.get("spot_id"),
+                    "spot_name": payload.get("spot_name"),
+                    "state": payload.get("state"),
+                }
+            )
+            self._recent_poi_triggers = self._recent_poi_triggers[-5:]
         if event_type == "question_answered" and narration_text:
             self._latest_answer_text = narration_text
         if event_type == "audio_playback_requested":
@@ -250,10 +303,16 @@ class JsonlSessionStore(SessionStore):
             "latest_spot_id": latest.get("spot_id"),
             "latest_spot_name": latest.get("spot_name"),
             "latest_narration_text": self._latest_narration_text,
+            "latest_narrated_spot_id": None if not self._recent_narrations else self._recent_narrations[-1].get("spot_id"),
+            "latest_narrated_spot_name": None if not self._recent_narrations else self._recent_narrations[-1].get("spot_name"),
+            "latest_triggered_spot_id": None if not self._recent_poi_triggers else self._recent_poi_triggers[-1].get("spot_id"),
+            "latest_triggered_spot_name": None if not self._recent_poi_triggers else self._recent_poi_triggers[-1].get("spot_name"),
             "latest_answer_text": self._latest_answer_text,
             "latest_audio_playback": self._latest_audio_playback,
             "audio_summary": audio_summary,
             "recent_audio_events": list(self._recent_audio_events),
+            "recent_narrations": list(self._recent_narrations),
+            "recent_poi_triggers": list(self._recent_poi_triggers),
         }
 
     def get_latest_session_summary(self) -> Dict[str, Any]:
@@ -287,10 +346,16 @@ class JsonlSessionStore(SessionStore):
                 "latest_spot_id": None,
                 "latest_spot_name": None,
                 "latest_narration_text": None,
+                "latest_narrated_spot_id": None,
+                "latest_narrated_spot_name": None,
+                "latest_triggered_spot_id": None,
+                "latest_triggered_spot_name": None,
                 "latest_answer_text": None,
                 "latest_audio_playback": None,
                 "audio_summary": build_audio_summary_from_latest_audio_playback(None),
                 "recent_audio_events": [],
+                "recent_narrations": [],
+                "recent_poi_triggers": [],
             }
 
         latest_path = files[-1]
@@ -320,6 +385,8 @@ class JsonlSessionStore(SessionStore):
             ),
             None,
         )
+        recent_narrations = _build_recent_narrations(events)
+        recent_poi_triggers = _build_recent_poi_triggers(events)
         return {
             "session_id": latest.get("session_id"),
             "session_log_path": str(latest_path),
@@ -330,6 +397,10 @@ class JsonlSessionStore(SessionStore):
             "latest_spot_id": latest.get("spot_id"),
             "latest_spot_name": latest.get("spot_name"),
             "latest_narration_text": latest_narration,
+            "latest_narrated_spot_id": None if not recent_narrations else recent_narrations[-1].get("spot_id"),
+            "latest_narrated_spot_name": None if not recent_narrations else recent_narrations[-1].get("spot_name"),
+            "latest_triggered_spot_id": None if not recent_poi_triggers else recent_poi_triggers[-1].get("spot_id"),
+            "latest_triggered_spot_name": None if not recent_poi_triggers else recent_poi_triggers[-1].get("spot_name"),
             "latest_answer_text": latest_answer,
             "latest_audio_playback": latest_audio_playback,
             "audio_summary": build_audio_summary_from_latest_audio_playback(
@@ -339,6 +410,8 @@ class JsonlSessionStore(SessionStore):
                 recent_audio_events=_build_recent_audio_events(events),
             ),
             "recent_audio_events": _build_recent_audio_events(events),
+            "recent_narrations": recent_narrations,
+            "recent_poi_triggers": recent_poi_triggers,
         }
 
 

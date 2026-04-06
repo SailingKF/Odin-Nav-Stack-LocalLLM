@@ -162,6 +162,7 @@ class MVSimLiveRuntimeTests(unittest.TestCase):
             probe["live_validation_alignment"]["expected_outcome"],
             "first_live_poi_hit_and_narration",
         )
+        self.assertIsNone(probe["live_validation_alignment"]["motion_strategy"])
 
 
 if __name__ == "__main__":

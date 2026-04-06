@@ -1056,12 +1056,19 @@ python scripts/run_mvsim_live_bridge_demo.py --config configs/sim.yaml --base-ur
 The current `sim.yaml` now records:
 - `mvsim_integration.live_pose_topic: /tour_bot/pose`
 - `mvsim_integration.live_bridge_mode: wsl_topic_echo_to_http_ingress`
-- `mvsim_integration.live_validation_alignment.strategy: world_init_pose_matches_first_route_poi`
+- `mvsim_integration.live_validation_alignment.strategy: isolated_live_validation_world_with_forward_motion`
+- `mvsim_integration.live_validation_alignment.motion_strategy: constant_forward_velocity_along_demo_axis`
 - `mvsim_integration.live_validation_alignment.target_spot_name: East Gate`
+- `mvsim_integration.live_validation_alignment.second_target_spot_name: Central Plaza`
 
-Round 035 live first-narration baseline:
-- the repo-local MVSim world init pose is now explicitly aligned to the first current POI
-- this is a narrow validation choice for proving the first live POI hit and first live-triggered narration event
+Round 036 live multistop baseline:
+- the repo now uses an explicit isolated validation world and vehicle for live multi-stop checking
+- the live progression lane is a fixed forward path at `y=0.5`
+- that path truthfully triggered:
+  - `East Gate`
+  - `Central Plaza`
+  - `History Gallery`
+- the route truthfully completed in the existing Windows-side stack during live MVSim validation
 - the live bridge demo now prints a `live_validation_summary`
 - after running the live bridge, `/debug` on `http://127.0.0.1:8000/debug` can show the resulting narration text from the existing Windows-side stack
 

@@ -56,8 +56,9 @@ The minimal world is intentionally simple:
 
 Current live-validation alignment note:
 
-- for the Round 035 baseline, the world init pose is intentionally aligned to the first current POI
-- this keeps the change narrow while proving the first live-triggered narration event
+- for the Round 036 baseline, the repo now uses an isolated live-validation world and vehicle pair for truthful multi-stop progression
+- the live path starts near the first current POI and follows a fixed forward lane at `y=0.5`
+- one internal wall segment was removed from that isolated validation world so the robot can progress beyond `x≈2.11`
 - the chosen alignment is recorded in `configs/sim.yaml` under:
   - `mvsim_integration.live_validation_alignment`
 
@@ -329,6 +330,39 @@ What this enables truthfully:
 
 This remains a narrow validation asset choice, not a claim of full live autonomous progression.
 
+## Round 036 Live Second POI Progression And Minimal Multi-Stop Motion
+
+The next narrow step was to progress beyond the first stop without broadening into simulator redesign.
+
+The truthful blocker discovered first was:
+
+- the initial forward-motion validation world stopped the robot near `x≈2.11`
+- the blocking cause was the internal wall segment:
+  - `<pt>2.4 -0.3</pt> <pt>5.2 -0.3</pt>`
+
+The second truthful blocker discovered after removing that wall was:
+
+- the straight `y=0` path only touched the `Central Plaza` trigger radius tangentially
+- that made second-stop triggering depend on landing exactly on the tangent point
+
+The chosen narrow fix was:
+
+- keep the current POI and route content unchanged
+- keep the live bridge path unchanged
+- keep the explicit isolated live-validation world
+- move the live progression lane to:
+  - `init_pose: 0.0 0.5 0.0`
+
+What this enabled truthfully:
+
+- `East Gate` was triggered live
+- `Central Plaza` was triggered live
+- `History Gallery` was triggered live
+- the existing stack emitted live narration for all three stops
+- the route completed in the existing Windows-side stack
+
+This is still a validation-asset result, not a claim of broad simulator autonomy.
+
 ## Exact Blocker Behavior
 
 When `mvsim_integration.mode` is set to `live_runtime` and the executable is missing:
@@ -344,8 +378,8 @@ This is intentional.
 
 ## What Still Remains After This Round
 
-- moving beyond the first live POI hit into truthful continuous live route progression
-- deciding whether the minimal MVSim world should gain controlled motion or stay a first-hit-only validation asset
-- validating a second live POI hit only if that can be done without simulator redesign
+- deciding whether this isolated live-validation asset should remain the accepted baseline for MVSim PC validation
+- if needed later, separating "first principles live bridge validation" from richer simulation realism without regressing the truthful baseline
+- keeping future simulator changes explicit instead of silently changing the validated live lane
 
 This round intentionally stops before ROS formalization, simulator redesign, or map-format work.
