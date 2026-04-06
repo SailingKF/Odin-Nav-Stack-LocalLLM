@@ -13,6 +13,10 @@ import yaml
 from adapters.sim.frame_transform import SimFrameTransformConfig
 from adapters.sim.projection import SimPoseProjectionConfig
 from services.deployment_profile import build_deployment_endpoint_contract, build_deployment_launch_plan
+from services.mvsim_validation_harness.reporting import (
+    ValidationReportStore,
+    build_validation_report,
+)
 from services.sim_publisher_bridge.http_client import SimIngressHttpClient
 from services.sim_publisher_bridge.mvsim_live import (
     describe_mvsim_runtime_mode,
@@ -149,6 +153,7 @@ class MVSimValidationHarnessRuntime:
         self._managed_service_mode: Optional[str] = None
         self._runtime_dir = repo_root / "session_logs" / "mvsim_validation_harness"
         self._runtime_dir.mkdir(parents=True, exist_ok=True)
+        self._report_store = ValidationReportStore(self._runtime_dir / "reports")
         self._managed_processes: Dict[str, subprocess.Popen] = {}
         self._last_validation_result: Optional[Dict[str, Any]] = None
 
@@ -238,6 +243,28 @@ class MVSimValidationHarnessRuntime:
 
     def _debug_url(self, service_specs: Dict[str, Dict[str, Any]]) -> str:
         return f"{service_specs['api_server']['base_url']}/debug"
+
+    @property
+    def debug_url(self) -> str:
+        active_config = self._config_for_validation_mode(self._selected_validation_mode)
+        return self._debug_url(self._build_service_specs(active_config))
+
+    def latest_report(self) -> Optional[Dict[str, Any]]:
+        return self._report_store.read_latest_report()
+
+    def recent_reports(self, limit: int = 5) -> List[Dict[str, Any]]:
+        return self._report_store.read_recent_reports(limit=limit)
+
+    def _persist_validation_report(self, validation_result: Dict[str, Any], service_specs: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        report = build_validation_report(
+            validation_result=validation_result,
+            config_path=self._config_path,
+            harness_url=self._harness_url,
+            debug_url=self._debug_url(service_specs),
+        )
+        persisted = self._report_store.write_report(report)
+        validation_result["validation_report"] = persisted
+        return validation_result
 
     def _http_get_json(self, url: str, timeout_sec: float = 5.0) -> Dict[str, Any]:
         request = Request(url=url, method="GET")
@@ -359,6 +386,8 @@ class MVSimValidationHarnessRuntime:
                 validation_result=self._last_validation_result,
             ),
             "last_validation_result": self._last_validation_result,
+            "latest_report": self.latest_report(),
+            "recent_reports": self.recent_reports(),
         }
 
     def _wait_for_service(
@@ -591,7 +620,7 @@ class MVSimValidationHarnessRuntime:
                         "live MVSim runtime path is configured but not ready on this PC",
                     ),
                 }
-                return self._last_validation_result
+                return self._persist_validation_report(self._last_validation_result, service_specs)
 
         start_result = self.start_local_stack(validation_mode=mode)
         sim_check = start_result["service_checks"]["sim_pose_ingress"]
@@ -606,7 +635,7 @@ class MVSimValidationHarnessRuntime:
                 "service_checks": start_result["service_checks"],
                 "detail": "required local services are not reachable",
             }
-            return self._last_validation_result
+            return self._persist_validation_report(self._last_validation_result, service_specs)
 
         try:
             bridge_bundle = (
@@ -623,7 +652,7 @@ class MVSimValidationHarnessRuntime:
                 "service_checks": start_result["service_checks"],
                 "detail": str(exc),
             }
-            return self._last_validation_result
+            return self._persist_validation_report(self._last_validation_result, service_specs)
 
         bridge_result = dict(bridge_bundle.get("bridge_result") or {})
         api_base_url = service_specs["api_server"]["base_url"]
@@ -667,4 +696,4 @@ class MVSimValidationHarnessRuntime:
             "question_result": question_result,
             "debug_url": self._debug_url(service_specs),
         }
-        return self._last_validation_result
+        return self._persist_validation_report(self._last_validation_result, service_specs)

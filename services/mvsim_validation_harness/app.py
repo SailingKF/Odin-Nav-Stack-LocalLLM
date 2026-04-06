@@ -66,6 +66,14 @@ def create_app(
             validation_mode=payload.validation_mode,
         )
 
+    @app.get("/reports/latest")
+    def latest_report() -> dict:
+        return {"latest_report": active_runtime.latest_report()}
+
+    @app.get("/reports/recent")
+    def recent_reports(limit: int = 5) -> dict:
+        return {"recent_reports": active_runtime.recent_reports(limit=limit)}
+
     @app.get("/debug-link")
     def debug_link() -> dict:
         return {"debug_url": active_runtime.debug_url}

@@ -149,3 +149,34 @@ It also distinguishes these truths cleanly:
 - live runtime is available in WSL
 - the harness can run the truthful live MVSim path itself
 - the harness can do that on an isolated local stack without depending on the machine-global `8000` port
+
+## Validation Report Artifacts
+
+Each completed harness validation run now writes one durable JSON report under:
+
+- `session_logs/mvsim_validation_harness/reports/`
+
+The report keeps the run concise and operator-readable.
+
+Current essentials include:
+
+- timestamp
+- validation mode
+- config path
+- pass/fail
+- session id
+- route completion
+- first/second live stop truth
+- recent triggered spots
+- recent narrated spots
+- debug URL and service targets
+
+Current read surfaces:
+
+- `GET /reports/latest`
+- `GET /reports/recent`
+- harness status also includes:
+  - `latest_report`
+  - `recent_reports`
+
+This means an operator can inspect the most recent validation result later without replaying the run.

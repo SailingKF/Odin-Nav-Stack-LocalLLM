@@ -72,6 +72,8 @@
       <section class="card"><h2>Overall Summary</h2><div id="summaryPanel" class="kv"></div></section>
       <section class="card"><h2>Service Checks</h2><div id="servicePanel" class="kv"></div></section>
       <section class="card"><h2>Validation Result</h2><div id="validationPanel" class="kv"></div></section>
+      <section class="card"><h2>Latest Report</h2><div id="latestReportPanel" class="kv"></div></section>
+      <section class="card"><h2>Recent Runs</h2><div id="recentReportsPanel" class="kv"></div></section>
     </div>
   </main>
   <script>
@@ -80,6 +82,8 @@
       summaryPanel: document.getElementById("summaryPanel"),
       servicePanel: document.getElementById("servicePanel"),
       validationPanel: document.getElementById("validationPanel"),
+      latestReportPanel: document.getElementById("latestReportPanel"),
+      recentReportsPanel: document.getElementById("recentReportsPanel"),
       questionInput: document.getElementById("questionInput"),
       openDebug: document.getElementById("openDebug"),
       modeSelect: document.getElementById("modeSelect"),
@@ -107,6 +111,8 @@
       const serviceChecks = payload.service_checks || {};
       const snapshot = payload.validation_snapshot || {};
       const validation = payload.last_validation_result || {};
+      const latestReport = payload.latest_report || {};
+      const recentReports = payload.recent_reports || [];
       const validationModes = payload.validation_modes || {};
       if (Array.isArray(validationModes.available) && validationModes.available.length) {
         elements.modeSelect.innerHTML = "";
@@ -163,6 +169,22 @@
         ["Question Result", validation.question_result ? validation.question_result.answer_text : null],
         ["Blocker", validation.detail || null],
       ]);
+      renderPanel(elements.latestReportPanel, [
+        ["Report ID", latestReport.report_id || null],
+        ["Status", latestReport.status || null, latestReport.status==="passed" ? "ok" : latestReport.status ? "fail" : null],
+        ["Validation Mode", latestReport.validation_mode || null, latestReport.validation_mode==="live_runtime" ? "ok" : latestReport.validation_mode==="compatibility_shim" ? "warn" : null],
+        ["Created At", latestReport.created_at || null],
+        ["Session ID", latestReport.session_id || null],
+        ["First Live POI Hit", latestReport.live_first_poi_hit_occurred, latestReport.live_first_poi_hit_occurred ? "ok" : latestReport.validation_mode==="live_runtime" ? "warn" : null],
+        ["Second Live POI Hit", latestReport.live_second_poi_hit_occurred, latestReport.live_second_poi_hit_occurred ? "ok" : latestReport.validation_mode==="live_runtime" ? "warn" : null],
+        ["Route Completed", latestReport.route_completed, latestReport.route_completed ? "ok" : "warn"],
+        ["Triggered Spots", Array.isArray(latestReport.recent_triggered_spot_ids) ? latestReport.recent_triggered_spot_ids.join(", ") : null],
+        ["Narrated Spots", Array.isArray(latestReport.recent_narrated_spot_ids) ? latestReport.recent_narrated_spot_ids.join(", ") : null],
+        ["Report Path", latestReport.report_path || null],
+      ]);
+      renderPanel(elements.recentReportsPanel, (recentReports || []).slice(0,5).map(item => [
+        item.report_id || "unknown", `${item.validation_mode || "unknown"} | ${item.status || "unknown"} | route_completed=${item.route_completed ? "true" : "false"} | spots=${Array.isArray(item.recent_triggered_spot_ids) ? item.recent_triggered_spot_ids.join(",") : ""}`, item.status==="passed" ? "ok" : "warn"
+      ]));
     }
     function selectedValidationMode() { return elements.modeSelect.value || "live_runtime"; }
     async function refreshStatus() { try { const payload = await callApi("/status"); renderStatus(payload); setFeedback("Status refreshed."); } catch (error) { setFeedback(`Status refresh failed: ${error.message}`, true); } }

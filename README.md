@@ -1100,10 +1100,36 @@ curl -X POST http://127.0.0.1:8301/services/start -H "Content-Type: application/
 curl -X POST http://127.0.0.1:8301/validation/run -H "Content-Type: application/json" -d "{\"validation_mode\":\"live_runtime\",\"question\":\"What does this final stop prove?\"}"
 ```
 
+Round 038 report artifact baseline:
+- every harness validation run now writes one durable JSON report under:
+  - `session_logs/mvsim_validation_harness/reports/`
+- each report keeps the operator-facing essentials:
+  - timestamp
+  - validation mode
+  - config path
+  - pass/fail
+  - session id
+  - route completion
+  - first/second live stop truth
+  - recent triggered/narrated spots
+- the harness now exposes:
+  - `GET /reports/latest`
+  - `GET /reports/recent`
+- the harness page now shows:
+  - latest report
+  - small recent-run history
+
+How to inspect the latest report without rerunning validation:
+```shell
+curl http://127.0.0.1:8301/reports/latest
+curl http://127.0.0.1:8301/reports/recent
+```
+
 Focused docs:
 - `docs/MVSIM_LIVE_RUNTIME_BRINGUP.md`
 - `docs/MVSIM_LIVE_POSE_BRIDGE.md`
 - `docs/MVSIM_VALIDATION_HARNESS.md`
+- `docs/MVSIM_VALIDATION_REPORTS.md`
 
 Focused doc:
 - `docs/MVSIM_LIVE_RUNTIME_BRINGUP.md`
