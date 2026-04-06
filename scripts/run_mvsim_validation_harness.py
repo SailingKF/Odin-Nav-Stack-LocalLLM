@@ -14,7 +14,11 @@ from services.mvsim_validation_harness.app import create_app
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the MVSim guided validation harness.")
-    parser.add_argument("--config", default=str(REPO_ROOT / "configs" / "sim.yaml"), help="Config file to load.")
+    parser.add_argument(
+        "--config",
+        default=str(REPO_ROOT / "configs" / "sim_harness.yaml"),
+        help="Config file to load.",
+    )
     parser.add_argument("--host", default="127.0.0.1", help="Bind host.")
     parser.add_argument("--port", type=int, default=8300, help="Bind port.")
     parser.add_argument(

@@ -1,0 +1,78 @@
+env_name: sim
+pose_provider_type: sim_ingress
+narrator_type: mock
+audio_output_type: mock
+tts_backend_type: mock
+artifact_player_backend_type: mock
+tts_artifact_dir: session_logs/sim_harness_tts_artifacts
+narration_mode_default: standard
+llm_gateway_url: http://127.0.0.1:9000
+llm_backend_type: mock
+llm_model_name: gemma-local
+llm_base_url: http://127.0.0.1:11434
+llm_timeout_sec: 8.0
+llm_enable_fallback: true
+service_endpoints:
+  sim_pose_ingress_server:
+    bind_host: 127.0.0.1
+    connect_host: 127.0.0.1
+    port: 8110
+    scheme: http
+  api_server:
+    bind_host: 127.0.0.1
+    connect_host: 127.0.0.1
+    port: 8001
+    scheme: http
+session_log_dir: session_logs/sim_harness
+recording_enabled: false
+current_route_file: content/routes/demo_route.yaml
+current_poi_file: content/poi/demo_pois.yaml
+publisher_pose_projection:
+  projected_x_field: sim_x
+  projected_y_field: sim_y
+  planar_x_source_path: position.x
+  planar_y_source_path: position.y
+  planar_z_source_path: position.z
+  yaw_source_path: orientation.yaw_rad
+  label_field: label
+publisher_frame_transform:
+  raw_x_field: sim_x
+  raw_y_field: sim_y
+  swap_axes: true
+  flip_x: true
+  flip_y: true
+  scale: 1.0
+  offset_x: 0.0
+  offset_y: 0.0
+mvsim_integration:
+  mode: live_runtime
+  runtime_host: wsl
+  executable: mvsim
+  wsl_distribution: Ubuntu
+  wsl_user: root
+  wsl_executable_path: /root/round033-mvsim-build/bin/mvsim
+  live_pose_topic: /tour_bot/pose
+  live_pose_message_type: mvsim_msgs.TimeStampedPose
+  live_bridge_mode: wsl_topic_echo_to_http_ingress
+  live_validation_alignment:
+    strategy: isolated_live_validation_world_with_forward_motion
+    motion_strategy: constant_forward_velocity_along_demo_axis
+    target_spot_id: gate
+    target_spot_name: East Gate
+    target_x: 0.0
+    target_y: 0.0
+    second_target_spot_id: plaza
+    second_target_spot_name: Central Plaza
+    second_target_x: 5.0
+    second_target_y: 1.0
+    expected_outcome: second_live_poi_hit_and_second_narration
+  world_file: content/sim/mvsim/worlds/odin_live_multistop_tour.world.xml
+  observation_file: content/sim/demo_mvsim_pose_stream.yaml
+  assumed_frame_id: map
+  vehicle_name: tour_bot
+validation_harness:
+  default_validation_mode: live_runtime
+  available_validation_modes:
+    - compatibility_shim
+    - live_runtime
+  live_sample_count: 180

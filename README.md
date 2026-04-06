@@ -1072,9 +1072,38 @@ Round 036 live multistop baseline:
 - the live bridge demo now prints a `live_validation_summary`
 - after running the live bridge, `/debug` on `http://127.0.0.1:8000/debug` can show the resulting narration text from the existing Windows-side stack
 
+Round 037 harness baseline:
+- the MVSim validation harness can now run both:
+  - `compatibility_shim`
+  - `live_runtime`
+- the recommended operator entry now uses:
+  - `configs/sim_harness.yaml`
+- that config isolates the local harness stack onto:
+  - sim ingress: `http://127.0.0.1:8110`
+  - API + `/debug`: `http://127.0.0.1:8001`
+- this means live validation no longer depends on the machine-global default `8000` port
+- the harness can now launch the local stack and run the truthful live MVSim bridge itself
+- the harness status and result surfaces now show:
+  - selected validation mode
+  - whether first live POI hit occurred
+  - whether second live POI hit occurred
+  - whether route completion occurred
+
+How to run the operator-facing harness path:
+```shell
+python scripts/run_mvsim_validation_harness.py --config configs/sim_harness.yaml --host 127.0.0.1 --port 8301
+```
+
+Then use the harness or call it directly:
+```shell
+curl -X POST http://127.0.0.1:8301/services/start -H "Content-Type: application/json" -d "{\"validation_mode\":\"live_runtime\"}"
+curl -X POST http://127.0.0.1:8301/validation/run -H "Content-Type: application/json" -d "{\"validation_mode\":\"live_runtime\",\"question\":\"What does this final stop prove?\"}"
+```
+
 Focused docs:
 - `docs/MVSIM_LIVE_RUNTIME_BRINGUP.md`
 - `docs/MVSIM_LIVE_POSE_BRIDGE.md`
+- `docs/MVSIM_VALIDATION_HARNESS.md`
 
 Focused doc:
 - `docs/MVSIM_LIVE_RUNTIME_BRINGUP.md`

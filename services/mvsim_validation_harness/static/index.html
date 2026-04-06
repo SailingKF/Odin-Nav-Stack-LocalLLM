@@ -32,6 +32,7 @@
     .badge.fail { background:rgba(178,58,72,.12); color:var(--danger); }
     .badge.warn { background:rgba(176,107,28,.14); color:var(--warning); }
     textarea { width:100%; min-height:82px; resize:vertical; border-radius:14px; border:1px solid var(--border); background:#fff; padding:12px 14px; font:inherit; }
+    select { width:100%; min-height:50px; border-radius:14px; border:1px solid var(--border); background:#fff; padding:10px 12px; font:inherit; }
     .hint { margin:0; color:var(--muted); font-size:.92rem; line-height:1.45; }
     @media (max-width:640px) { .button-grid { grid-template-columns:1fr; } .hero h1 { font-size:1.35rem; } }
   </style>
@@ -45,6 +46,12 @@
     <div class="grid">
       <section class="card">
         <h2>Operator Actions</h2>
+        <label class="kv-key" for="modeSelect" style="margin-bottom:8px;display:block;">Validation Mode</label>
+        <select id="modeSelect">
+          <option value="live_runtime">live_runtime</option>
+          <option value="compatibility_shim">compatibility_shim</option>
+        </select>
+        <p class="hint" style="margin:10px 0 12px;">Live mode launches the truthful WSL MVSim path and uses the harness-isolated local stack ports. Compatibility mode reuses the existing replay bridge on the same isolated local stack.</p>
         <div class="button-grid">
           <button id="startStack" class="primary" type="button">Start / Attach Local Stack</button>
           <button id="runValidation" class="secondary" type="button">Run MVSim Validation</button>
@@ -75,6 +82,7 @@
       validationPanel: document.getElementById("validationPanel"),
       questionInput: document.getElementById("questionInput"),
       openDebug: document.getElementById("openDebug"),
+      modeSelect: document.getElementById("modeSelect"),
     };
     function setFeedback(message, isError=false) { elements.feedback.textContent = message; elements.feedback.classList.toggle("error", Boolean(isError)); }
     function badge(text, kind) { const span=document.createElement("span"); span.className=`badge${kind==="fail"?" fail":kind==="warn"?" warn":""}`; span.textContent=text; return span; }
@@ -99,9 +107,24 @@
       const serviceChecks = payload.service_checks || {};
       const snapshot = payload.validation_snapshot || {};
       const validation = payload.last_validation_result || {};
+      const validationModes = payload.validation_modes || {};
+      if (Array.isArray(validationModes.available) && validationModes.available.length) {
+        elements.modeSelect.innerHTML = "";
+        validationModes.available.forEach(mode => {
+          const option = document.createElement("option");
+          option.value = mode;
+          option.textContent = mode;
+          elements.modeSelect.appendChild(option);
+        });
+      }
+      if (validationModes.selected_validation_mode) {
+        elements.modeSelect.value = validationModes.selected_validation_mode;
+      }
       elements.openDebug.href = payload.debug_url || "#";
       renderPanel(elements.summaryPanel, [
         ["Harness URL", payload.harness_url],
+        ["Default Validation Mode", validationModes.default_validation_mode || null],
+        ["Selected Validation Mode", validationModes.selected_validation_mode || null, validationModes.selected_validation_mode==="live_runtime" ? "ok" : "warn"],
         ["Configured MVSim Mode", payload.mvsim_mode_summary ? payload.mvsim_mode_summary.configured_mode : null],
         ["Effective MVSim Mode", snapshot.mvsim_mode || (payload.mvsim_mode_summary ? payload.mvsim_mode_summary.effective_mode : null), snapshot.mvsim_mode==="compatibility_shim" ? "warn" : snapshot.mvsim_mode==="blocked_live_runtime" ? "fail" : "ok"],
         ["Live Runtime Available", snapshot.live_runtime_available, snapshot.live_runtime_available ? "ok" : "warn"],
@@ -113,6 +136,8 @@
         ["Expected First Live POI", payload.mvsim_mode_summary && payload.mvsim_mode_summary.live_runtime && payload.mvsim_mode_summary.live_runtime.live_validation_alignment ? payload.mvsim_mode_summary.live_runtime.live_validation_alignment.target_spot_name : null],
         ["Expected Second Live POI", payload.mvsim_mode_summary && payload.mvsim_mode_summary.live_runtime && payload.mvsim_mode_summary.live_runtime.live_validation_alignment ? payload.mvsim_mode_summary.live_runtime.live_validation_alignment.second_target_spot_name : null],
         ["Overall Status", snapshot.overall_status || "idle", snapshot.overall_status==="passed" ? "ok" : snapshot.overall_status==="failed" ? "fail" : "warn"],
+        ["Live First POI Hit", snapshot.live_first_poi_hit, snapshot.live_first_poi_hit ? "ok" : "warn"],
+        ["Live Second POI Hit", snapshot.live_second_poi_hit, snapshot.live_second_poi_hit ? "ok" : "warn"],
         ["Route Completed", snapshot.route_completed, snapshot.route_completed ? "ok" : "warn"],
         ["Latest Session", snapshot.latest_session_id],
         ["Latest Spot", snapshot.latest_spot_name],
@@ -128,7 +153,10 @@
       ]));
       renderPanel(elements.validationPanel, [
         ["Validation Status", validation.status || "not_run", validation.status==="passed" ? "ok" : validation.status && validation.status!=="not_run" ? "fail" : "warn"],
+        ["Validation Mode", validation.validation_mode || null, validation.validation_mode==="live_runtime" ? "ok" : validation.validation_mode==="compatibility_shim" ? "warn" : null],
         ["MVSim Source", validation.mvsim_source ? validation.mvsim_source.source_kind : (validation.mvsim_mode_summary ? validation.mvsim_mode_summary.effective_mode : null)],
+        ["First Live POI Hit", validation.live_validation_summary ? validation.live_validation_summary.live_first_poi_hit_occurred : null, validation.live_validation_summary && validation.live_validation_summary.live_first_poi_hit_occurred ? "ok" : validation.validation_mode==="live_runtime" ? "warn" : null],
+        ["Second Live POI Hit", validation.live_validation_summary ? validation.live_validation_summary.live_second_poi_hit_occurred : null, validation.live_validation_summary && validation.live_validation_summary.live_second_poi_hit_occurred ? "ok" : validation.validation_mode==="live_runtime" ? "warn" : null],
         ["Route Completed", validation.sim_ingress_state ? validation.sim_ingress_state.route_completed : null, validation.sim_ingress_state && validation.sim_ingress_state.route_completed ? "ok" : "warn"],
         ["Latest Narration", validation.api_latest_session ? validation.api_latest_session.latest_narration_text : null],
         ["Session ID", validation.api_latest_session ? validation.api_latest_session.session_id : null],
@@ -136,10 +164,11 @@
         ["Blocker", validation.detail || null],
       ]);
     }
+    function selectedValidationMode() { return elements.modeSelect.value || "live_runtime"; }
     async function refreshStatus() { try { const payload = await callApi("/status"); renderStatus(payload); setFeedback("Status refreshed."); } catch (error) { setFeedback(`Status refresh failed: ${error.message}`, true); } }
-    async function startStack() { try { const payload = await callApi("/services/start", "POST"); setFeedback(payload.ok ? "Local stack is ready." : "Local stack could not be prepared.", !payload.ok); await refreshStatus(); } catch (error) { setFeedback(`Start/attach failed: ${error.message}`, true); } }
+    async function startStack() { try { const payload = await callApi("/services/start", "POST", { validation_mode: selectedValidationMode() }); setFeedback(payload.ok ? `Local stack is ready for ${payload.validation_mode}.` : "Local stack could not be prepared.", !payload.ok); await refreshStatus(); } catch (error) { setFeedback(`Start/attach failed: ${error.message}`, true); } }
     async function stopStack() { try { const payload = await callApi("/services/stop", "POST"); setFeedback(`Stopped services: ${(payload.stopped_services || []).join(", ") || "none"}`); await refreshStatus(); } catch (error) { setFeedback(`Stop failed: ${error.message}`, true); } }
-    async function runValidation() { try { const payload = await callApi("/validation/run", "POST", { question: elements.questionInput.value.trim() || "What does this final stop prove?" }); setFeedback(payload.status==="passed" ? "Validation passed." : `Validation finished with status: ${payload.status}`, payload.status!=="passed"); await refreshStatus(); } catch (error) { setFeedback(`Validation failed: ${error.message}`, true); } }
+    async function runValidation() { try { const payload = await callApi("/validation/run", "POST", { validation_mode: selectedValidationMode(), question: elements.questionInput.value.trim() || "What does this final stop prove?" }); setFeedback(payload.status==="passed" ? `Validation passed in ${payload.validation_mode}.` : `Validation finished with status: ${payload.status}`, payload.status!=="passed"); await refreshStatus(); } catch (error) { setFeedback(`Validation failed: ${error.message}`, true); } }
     document.getElementById("refreshStatus").addEventListener("click", refreshStatus);
     document.getElementById("startStack").addEventListener("click", startStack);
     document.getElementById("stopStack").addEventListener("click", stopStack);

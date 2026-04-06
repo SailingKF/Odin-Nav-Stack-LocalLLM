@@ -14,6 +14,11 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 class ValidationRequest(BaseModel):
     question: str = "What does this final stop prove?"
+    validation_mode: str = "live_runtime"
+
+
+class ServiceActionRequest(BaseModel):
+    validation_mode: str = "live_runtime"
 
 
 def create_app(
@@ -47,8 +52,8 @@ def create_app(
         return active_runtime.status()
 
     @app.post("/services/start")
-    def start_services() -> dict:
-        return active_runtime.start_local_stack()
+    def start_services(payload: ServiceActionRequest) -> dict:
+        return active_runtime.start_local_stack(validation_mode=payload.validation_mode)
 
     @app.post("/services/stop")
     def stop_services() -> dict:
@@ -56,7 +61,10 @@ def create_app(
 
     @app.post("/validation/run")
     def run_validation(payload: ValidationRequest) -> dict:
-        return active_runtime.run_validation(question=payload.question)
+        return active_runtime.run_validation(
+            question=payload.question,
+            validation_mode=payload.validation_mode,
+        )
 
     @app.get("/debug-link")
     def debug_link() -> dict:

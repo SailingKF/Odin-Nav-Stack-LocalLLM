@@ -32,7 +32,7 @@ Runnable entry point:
 Run:
 
 ```text
-python scripts/run_mvsim_validation_harness.py --config configs/sim.yaml --open-browser
+python scripts/run_mvsim_validation_harness.py --config configs/sim_harness.yaml --open-browser
 ```
 
 Then use the local page:
@@ -53,11 +53,24 @@ The harness supports both:
 
 - attach to already-running local services
 - launch local services itself when ports are free
+- select an explicit validation mode:
+  - `compatibility_shim`
+  - `live_runtime`
 
 Current launched services are intentionally narrow:
 
 - sim pose ingress server
 - sim-profile API server
+
+Current isolated harness config:
+
+- `configs/sim_harness.yaml`
+- local sim ingress target:
+  - `http://127.0.0.1:8110`
+- local API target:
+  - `http://127.0.0.1:8001`
+
+This keeps operator validation off the machine-global default `8000` path.
 
 The harness does **not** try to become a general multi-service supervisor.
 
@@ -65,6 +78,7 @@ The harness does **not** try to become a general multi-service supervisor.
 
 The harness currently surfaces at least:
 
+- selected validation mode
 - configured MVSim mode
 - effective MVSim mode
 - live-runtime availability
@@ -81,13 +95,20 @@ The harness currently surfaces at least:
 - the configured live alignment strategy
 - the expected first live POI for the current repo-local MVSim validation asset
 - the expected second live POI for the current repo-local MVSim validation asset
+- whether the current live validation truthfully saw:
+  - first-stop hit
+  - second-stop hit
+  - route completion
 
-With the Round 033 WSL runtime update, the harness can now also truthfully show:
+With the live-harness baseline, the harness can now also truthfully show:
 
-- that a live MVSim runtime is available in WSL even while the validated end-to-end flow still uses `compatibility_shim`
+- that a live MVSim runtime is available in WSL
 - which runtime host is configured for live MVSim bring-up
 - whether the repo-local world asset is already compatible with the current Linux-side MVSim parser
-- which live pose topic and bridge mode are currently configured for the next bridge step
+- which live pose topic and bridge mode are currently configured for the current bridge step
+- whether the current validation run used:
+  - compatibility replay
+  - truthful live MVSim pose relay
 
 ## How Common Problems Are Reported
 
@@ -108,6 +129,8 @@ Current examples:
   - reported as `failed_precondition`
 - validation is switched to `live_runtime` but no real `mvsim` runtime is available
   - reported as `blocked_live_runtime_unavailable`
+- validation is switched to `live_runtime` but the bridge execution itself fails
+  - reported as `failed_bridge_execution`
 - WSL path is the recommended next step but the current shell is not elevated
   - surfaced through the WSL enablement section and probe blocker details
 
@@ -120,8 +143,9 @@ This harness does not:
 - replace `/debug`
 
 It makes the current PC-side MVSim validation flow much easier for a human to inspect.
-It also distinguishes three truths cleanly:
+It also distinguishes these truths cleanly:
 
 - compatibility shim works now
-- live runtime may already be available in WSL
-- a minimal live pose bridge may now be available even if full live route progression is still pending
+- live runtime is available in WSL
+- the harness can run the truthful live MVSim path itself
+- the harness can do that on an isolated local stack without depending on the machine-global `8000` port

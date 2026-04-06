@@ -27,16 +27,31 @@ class _FakeHarnessRuntime:
             "debug_url": self.debug_url,
             "supports_attach_existing": True,
             "supports_local_launch": True,
+            "validation_modes": {
+                "available": ["compatibility_shim", "live_runtime"],
+                "default_validation_mode": "live_runtime",
+                "selected_validation_mode": "live_runtime",
+            },
             "mvsim_mode_summary": {
-                "configured_mode": "compatibility_shim",
-                "effective_mode": "compatibility_shim",
+                "configured_mode": "live_runtime",
+                "effective_mode": "live_runtime",
                 "live_runtime": {
-                    "runtime_available": False,
+                    "runtime_available": True,
                     "world_file_exists": True,
+                    "live_pose_surface": {"topic_name": "/tour_bot/pose", "bridge_mode": "wsl_topic_echo_to_http_ingress"},
+                    "live_validation_alignment": {
+                        "strategy": "isolated_live_validation_world_with_forward_motion",
+                        "target_spot_name": "East Gate",
+                        "second_target_spot_name": "Central Plaza",
+                    },
                 },
                 "compatibility_source": {
                     "source_kind": "mvsim_compatibility_shim",
                     "observation_file_exists": True,
+                },
+                "wsl_enablement": {
+                    "wsl_installed": True,
+                    "current_shell_elevated": False,
                 },
             },
             "service_checks": {
@@ -67,8 +82,11 @@ class _FakeHarnessRuntime:
             },
             "validation_snapshot": {
                 "overall_status": "idle",
-                "mvsim_mode": "compatibility_shim",
-                "live_runtime_available": False,
+                "validation_mode": "live_runtime",
+                "mvsim_mode": "live_runtime",
+                "live_runtime_available": True,
+                "live_first_poi_hit": False,
+                "live_second_poi_hit": False,
                 "route_completed": False,
                 "latest_spot_name": None,
                 "latest_narration_text": None,
@@ -82,16 +100,24 @@ class _FakeHarnessRuntime:
     def status(self) -> dict:
         return self._status
 
-    def start_local_stack(self) -> dict:
-        return {"ok": True, "action": "start_local_stack", "service_checks": self._status["service_checks"], "debug_url": self.debug_url}
+    def start_local_stack(self, validation_mode: str = "live_runtime") -> dict:
+        self._status["validation_modes"]["selected_validation_mode"] = validation_mode
+        return {
+            "ok": True,
+            "action": "start_local_stack",
+            "validation_mode": validation_mode,
+            "service_checks": self._status["service_checks"],
+            "debug_url": self.debug_url,
+        }
 
     def stop_local_stack(self) -> dict:
         return {"ok": True, "action": "stop_local_stack", "stopped_services": ["sim_pose_ingress_server", "api_server"]}
 
-    def run_validation(self, question: str) -> dict:
+    def run_validation(self, question: str, validation_mode: str = "live_runtime") -> dict:
         result = {
             "status": "passed",
-            "mvsim_source": {"source_kind": "mvsim_compatibility_shim"},
+            "validation_mode": validation_mode,
+            "mvsim_source": {"source_kind": "mvsim_live_topic_echo" if validation_mode == "live_runtime" else "mvsim_compatibility_shim"},
             "sim_ingress_state": {"route_completed": True},
             "api_latest_session": {
                 "session_id": "mock_tour_123",
@@ -103,6 +129,11 @@ class _FakeHarnessRuntime:
                 "answer_text": f"Answered: {question}",
             },
         }
+        if validation_mode == "live_runtime":
+            result["live_validation_summary"] = {
+                "live_first_poi_hit_occurred": True,
+                "live_second_poi_hit_occurred": True,
+            }
         self._status["last_validation_result"] = result
         self._status["validation_snapshot"] = summarize_validation_snapshot(
             self._status["service_checks"]["sim_pose_ingress"],
@@ -174,6 +205,7 @@ class MVSimValidationHarnessTests(unittest.TestCase):
         api_check = build_operator_service_check("api", "API", "http://127.0.0.1:8000/health", True, "attach_existing", "ok")
         debug_check = build_operator_service_check("debug", "Debug", "http://127.0.0.1:8000/debug", True, "attach_existing", "ok")
         validation = {
+            "validation_mode": "compatibility_shim",
             "mvsim_mode": "compatibility_shim",
             "sim_ingress_state": {"route_completed": True},
             "api_latest_session": {"session_id": "mock_tour_1", "latest_spot_name": "History Gallery", "latest_narration_text": "Done"},
@@ -187,6 +219,7 @@ class MVSimValidationHarnessTests(unittest.TestCase):
         snapshot = summarize_validation_snapshot(sim_check, api_check, debug_check, mvsim_mode_summary, validation)
 
         self.assertEqual(snapshot["overall_status"], "passed")
+        self.assertEqual(snapshot["validation_mode"], "compatibility_shim")
         self.assertEqual(snapshot["mvsim_mode"], "compatibility_shim")
         self.assertTrue(snapshot["route_completed"])
         self.assertEqual(snapshot["latest_session_id"], "mock_tour_1")
@@ -203,27 +236,69 @@ class MVSimValidationHarnessTests(unittest.TestCase):
         snapshot = summarize_validation_snapshot(sim_check, api_check, debug_check, mvsim_mode_summary, None)
 
         self.assertEqual(snapshot["overall_status"], "idle")
+        self.assertEqual(snapshot["validation_mode"], "blocked_live_runtime")
         self.assertEqual(snapshot["mvsim_mode"], "blocked_live_runtime")
         self.assertFalse(snapshot["debug_available"])
+
+    def test_runtime_uses_harness_default_mode_and_isolated_ports(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        runtime = MVSimValidationHarnessRuntime(
+            config_path=repo_root / "configs" / "sim_harness.yaml",
+            repo_root=repo_root,
+        )
+
+        status = runtime.status()
+
+        self.assertEqual(status["validation_modes"]["default_validation_mode"], "live_runtime")
+        self.assertEqual(status["validation_modes"]["selected_validation_mode"], "live_runtime")
+        self.assertIn("compatibility_shim", status["validation_modes"]["available"])
+        self.assertIn("live_runtime", status["validation_modes"]["available"])
+        self.assertEqual(
+            status["service_checks"]["api_server"]["target_url"],
+            "http://127.0.0.1:8001/health",
+        )
+        self.assertEqual(
+            status["service_checks"]["sim_pose_ingress"]["target_url"],
+            "http://127.0.0.1:8110/health",
+        )
 
     def test_harness_page_and_actions_are_served(self) -> None:
         client = TestClient(create_app(runtime=_FakeHarnessRuntime()))
 
         page = client.get("/harness")
         status = client.get("/status")
-        start = client.post("/services/start")
-        validation = client.post("/validation/run", json={"question": "What does this final stop prove?"})
+        start = client.post("/services/start", json={"validation_mode": "live_runtime"})
+        validation = client.post(
+            "/validation/run",
+            json={"validation_mode": "live_runtime", "question": "What does this final stop prove?"},
+        )
         debug_link = client.get("/debug-link")
 
         self.assertEqual(page.status_code, 200)
         self.assertIn("MVSim Validation Harness", page.text)
         self.assertIn("Run MVSim Validation", page.text)
         self.assertIn("Configured MVSim Mode", page.text)
+        self.assertIn("Validation Mode", page.text)
         self.assertEqual(status.status_code, 200)
         self.assertEqual(status.json()["service"], "mvsim-validation-harness")
         self.assertTrue(start.json()["ok"])
+        self.assertEqual(start.json()["validation_mode"], "live_runtime")
         self.assertEqual(validation.json()["status"], "passed")
+        self.assertEqual(validation.json()["validation_mode"], "live_runtime")
         self.assertEqual(debug_link.json()["debug_url"], "http://127.0.0.1:8000/debug")
+
+    def test_harness_can_run_compatibility_mode_request(self) -> None:
+        client = TestClient(create_app(runtime=_FakeHarnessRuntime()))
+
+        validation = client.post(
+            "/validation/run",
+            json={"validation_mode": "compatibility_shim", "question": "What does this final stop prove?"},
+        )
+
+        self.assertEqual(validation.status_code, 200)
+        self.assertEqual(validation.json()["status"], "passed")
+        self.assertEqual(validation.json()["validation_mode"], "compatibility_shim")
+        self.assertEqual(validation.json()["mvsim_source"]["source_kind"], "mvsim_compatibility_shim")
 
 
 if __name__ == "__main__":
