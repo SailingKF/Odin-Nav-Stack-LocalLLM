@@ -13,6 +13,7 @@ import yaml
 from adapters.sim.frame_transform import SimFrameTransformConfig
 from adapters.sim.projection import SimPoseProjectionConfig
 from services.deployment_profile import build_deployment_endpoint_contract, build_deployment_launch_plan
+from services.mvsim_validation_harness.map_view import build_validation_map_view
 from services.mvsim_validation_harness.reporting import (
     ComparisonExportStore,
     ValidationReportStore,
@@ -386,6 +387,13 @@ class MVSimValidationHarnessRuntime:
                 extra={"error": str(exc)},
             )
 
+    def _probe_api_state(self, service_specs: Dict[str, Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        api_base_url = service_specs["api_server"]["base_url"]
+        try:
+            return self._http_get_json(f"{api_base_url}/state", timeout_sec=self._PROBE_TIMEOUT_SEC)
+        except (URLError, HTTPError, TimeoutError, OSError, ValueError):
+            return None
+
     def status(self) -> Dict[str, Any]:
         selected_mode = self._selected_validation_mode
         active_config = self._config_for_validation_mode(selected_mode)
@@ -394,6 +402,16 @@ class MVSimValidationHarnessRuntime:
         api_check = self._probe_service_health("api_server", service_specs)
         debug_check = self._probe_debug_page(service_specs)
         mvsim_mode_summary = describe_mvsim_runtime_mode(active_config, self._repo_root)
+        latest_report = self.latest_report()
+        current_api_state = self._probe_api_state(service_specs) if api_check.get("reachable") else None
+        validation_map_view = build_validation_map_view(
+            config=active_config,
+            repo_root=self._repo_root,
+            latest_report=latest_report,
+            last_validation_result=self._last_validation_result,
+            current_api_state=current_api_state,
+            selected_validation_mode=selected_mode,
+        )
         return {
             "status": "ok",
             "service": "mvsim-validation-harness",
@@ -420,8 +438,9 @@ class MVSimValidationHarnessRuntime:
                 mvsim_mode_summary=mvsim_mode_summary,
                 validation_result=self._last_validation_result,
             ),
+            "validation_map_view": validation_map_view,
             "last_validation_result": self._last_validation_result,
-            "latest_report": self.latest_report(),
+            "latest_report": latest_report,
             "recent_reports": self.recent_reports(),
             "latest_comparison": self.latest_comparison_summary(),
             "latest_comparison_export": self.latest_comparison_export(),

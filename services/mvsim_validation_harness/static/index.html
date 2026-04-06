@@ -31,10 +31,23 @@
     .badge { display:inline-block; padding:6px 10px; border-radius:999px; font-weight:700; font-size:.92rem; background:rgba(15,107,96,.12); color:#0a4d45; }
     .badge.fail { background:rgba(178,58,72,.12); color:var(--danger); }
     .badge.warn { background:rgba(176,107,28,.14); color:var(--warning); }
+    .map-panel { display:grid; gap:12px; }
+    .map-meta { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .map-canvas { border-radius:18px; border:1px solid #d8ccb7; background:linear-gradient(180deg,#fffdfa 0%,#f3ede2 100%); min-height:260px; padding:8px; }
+    .map-canvas svg { width:100%; height:auto; display:block; }
+    .map-legend { display:flex; flex-wrap:wrap; gap:10px; color:var(--muted); font-size:.9rem; }
+    .legend-item { display:inline-flex; align-items:center; gap:6px; }
+    .legend-dot { width:12px; height:12px; border-radius:999px; display:inline-block; border:1px solid rgba(0,0,0,.12); }
+    .legend-dot.pending { background:#d6d1c5; }
+    .legend-dot.triggered { background:#d7a64a; }
+    .legend-dot.narrated { background:#0f6b60; }
+    .legend-dot.active { background:#1d4ed8; }
+    .legend-dot.pose { background:#b23a48; transform:rotate(45deg); border-radius:2px; }
+    .map-note { color:var(--muted); font-size:.92rem; line-height:1.45; }
     textarea { width:100%; min-height:82px; resize:vertical; border-radius:14px; border:1px solid var(--border); background:#fff; padding:12px 14px; font:inherit; }
     select { width:100%; min-height:50px; border-radius:14px; border:1px solid var(--border); background:#fff; padding:10px 12px; font:inherit; }
     .hint { margin:0; color:var(--muted); font-size:.92rem; line-height:1.45; }
-    @media (max-width:640px) { .button-grid { grid-template-columns:1fr; } .hero h1 { font-size:1.35rem; } }
+    @media (max-width:640px) { .button-grid,.map-meta { grid-template-columns:1fr; } .hero h1 { font-size:1.35rem; } }
   </style>
 </head>
 <body>
@@ -72,6 +85,7 @@
         <textarea id="questionInput">What does this final stop prove?</textarea>
         <p class="hint">This is sent after the simulated route completes so the operator can confirm follow-up question handling without manual REST calls.</p>
       </section>
+      <section class="card"><h2>Validation Map</h2><div id="mapPanel" class="map-panel"></div></section>
       <section class="card"><h2>Overall Summary</h2><div id="summaryPanel" class="kv"></div></section>
       <section class="card"><h2>Service Checks</h2><div id="servicePanel" class="kv"></div></section>
       <section class="card"><h2>Validation Result</h2><div id="validationPanel" class="kv"></div></section>
@@ -83,6 +97,7 @@
   <script>
     const elements = {
       feedback: document.getElementById("feedback"),
+      mapPanel: document.getElementById("mapPanel"),
       summaryPanel: document.getElementById("summaryPanel"),
       servicePanel: document.getElementById("servicePanel"),
       validationPanel: document.getElementById("validationPanel"),
@@ -97,6 +112,9 @@
     };
     function setFeedback(message, isError=false) { elements.feedback.textContent = message; elements.feedback.classList.toggle("error", Boolean(isError)); }
     function badge(text, kind) { const span=document.createElement("span"); span.className=`badge${kind==="fail"?" fail":kind==="warn"?" warn":""}`; span.textContent=text; return span; }
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>\"']/g, (char) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "\"":"&quot;", "'":"&#39;" }[char]));
+    }
     function formatIdentity(identity) {
       if (!identity || typeof identity !== "object") return null;
       const pairs = [
@@ -121,6 +139,81 @@
         wrapper.appendChild(keyEl); wrapper.appendChild(valueEl); panel.appendChild(wrapper);
       });
     }
+    function renderValidationMap(mapView) {
+      elements.mapPanel.innerHTML="";
+      if (!mapView || typeof mapView !== "object") {
+        elements.mapPanel.innerHTML = '<p class="map-note">Validation map is not available yet.</p>';
+        return;
+      }
+      const wrapper = document.createElement("div");
+      const meta = document.createElement("div");
+      meta.className = "map-meta";
+      [
+        ["Map Status", mapView.status || "unknown"],
+        ["Validation Mode", mapView.active_validation_mode || "unknown"],
+        ["Pose Source", mapView.data_sources ? mapView.data_sources.pose_source : null],
+        ["Progress Source", mapView.data_sources ? mapView.data_sources.progress_source : null],
+      ].forEach(([key, value]) => {
+        const card = document.createElement("div");
+        card.className = "kv-item";
+        card.innerHTML = `<span class="kv-key">${escapeHtml(key)}</span><div class="kv-value">${escapeHtml(value || "N/A")}</div>`;
+        meta.appendChild(card);
+      });
+      wrapper.appendChild(meta);
+
+      const canvas = document.createElement("div");
+      canvas.className = "map-canvas";
+      const points = Array.isArray(mapView.route_polyline) ? mapView.route_polyline : [];
+      const pointString = points.map(point => `${point.x},${point.y}`).join(" ");
+      const markers = Array.isArray(mapView.poi_markers) ? mapView.poi_markers : [];
+      const viewBox = mapView.view_box || { width:100, height:64 };
+      const pose = mapView.pose || null;
+      const markerSvg = markers.map(marker => {
+        const status = marker.visual_status || "pending";
+        const color = status === "active" ? "#1d4ed8" : status === "narrated" ? "#0f6b60" : status === "triggered" ? "#d7a64a" : "#d6d1c5";
+        const stroke = marker.is_latest ? "#b23a48" : "#5d5a54";
+        return `
+          <g>
+            <circle cx="${marker.screen.x}" cy="${marker.screen.y}" r="3.4" fill="${color}" stroke="${stroke}" stroke-width="${marker.is_latest ? 1.2 : 0.8}"></circle>
+            <text x="${marker.screen.x}" y="${marker.screen.y - 5.8}" font-size="3.4" text-anchor="middle" fill="#1e2a33">${escapeHtml(marker.order_index)}</text>
+            <text x="${marker.screen.x + 4.5}" y="${marker.screen.y + 1.2}" font-size="3.2" fill="#1e2a33">${escapeHtml(marker.spot_name)}</text>
+          </g>
+        `;
+      }).join("");
+      const poseSvg = pose ? `
+        <g>
+          <rect x="${pose.screen.x - 2.1}" y="${pose.screen.y - 2.1}" width="4.2" height="4.2" fill="#b23a48" transform="rotate(45 ${pose.screen.x} ${pose.screen.y})"></rect>
+          <text x="${pose.screen.x + 4.5}" y="${pose.screen.y - 4}" font-size="3.2" fill="#b23a48">${escapeHtml((pose.world && pose.world.label) || "robot")}</text>
+        </g>
+      ` : "";
+      canvas.innerHTML = `
+        <svg viewBox="0 0 ${viewBox.width || 100} ${viewBox.height || 64}" role="img" aria-label="Validation map showing route POIs and latest pose">
+          <rect x="0" y="0" width="${viewBox.width || 100}" height="${viewBox.height || 64}" rx="6" fill="rgba(255,255,255,0.6)"></rect>
+          ${pointString ? `<polyline points="${pointString}" fill="none" stroke="#8b8a86" stroke-width="1.2" stroke-dasharray="2.2 2.2"></polyline>` : ""}
+          ${markerSvg}
+          ${poseSvg}
+        </svg>
+        ${pose ? "" : '<p class="map-note">No current or persisted pose is available yet, so the schematic only shows route POIs and recent progression.</p>'}
+      `;
+      wrapper.appendChild(canvas);
+
+      const legend = document.createElement("div");
+      legend.className = "map-legend";
+      legend.innerHTML = `
+        <span class="legend-item"><span class="legend-dot pending"></span>Pending POI</span>
+        <span class="legend-item"><span class="legend-dot triggered"></span>Triggered POI</span>
+        <span class="legend-item"><span class="legend-dot narrated"></span>Narrated POI</span>
+        <span class="legend-item"><span class="legend-dot active"></span>Active POI</span>
+        <span class="legend-item"><span class="legend-dot pose"></span>Current or last pose</span>
+      `;
+      wrapper.appendChild(legend);
+
+      const detail = document.createElement("p");
+      detail.className = "map-note";
+      detail.textContent = `Route file: ${(mapView.data_sources && mapView.data_sources.route_file) || "N/A"} | POI file: ${(mapView.data_sources && mapView.data_sources.poi_file) || "N/A"} | Triggered: ${(mapView.recent_triggered_spot_ids || []).join(", ") || "none"} | Narrated: ${(mapView.recent_narrated_spot_ids || []).join(", ") || "none"}`;
+      wrapper.appendChild(detail);
+      elements.mapPanel.appendChild(wrapper);
+    }
     async function callApi(path, method="GET", body=null) {
       const response = await fetch(path, { method, headers:{ "Content-Type":"application/json" }, body: body ? JSON.stringify(body) : null });
       if (!response.ok) { throw new Error(`${response.status} ${response.statusText}: ${await response.text()}`); }
@@ -135,6 +228,7 @@
       const comparison = payload.latest_comparison || {};
       const latestComparisonExport = payload.latest_comparison_export || {};
       const latestComparisonHumanExport = payload.latest_comparison_human_export || {};
+      const validationMapView = payload.validation_map_view || {};
       const validationModes = payload.validation_modes || {};
       if (Array.isArray(validationModes.available) && validationModes.available.length) {
         elements.modeSelect.innerHTML = "";
@@ -151,6 +245,7 @@
       elements.openDebug.href = payload.debug_url || "#";
       elements.openLatestExport.href = latestComparisonExport.export_id ? "/reports/compare/export/latest" : "#";
       elements.openLatestHumanExport.href = latestComparisonHumanExport.human_readable_export_path ? "/reports/compare/export/latest/human" : "#";
+      renderValidationMap(validationMapView);
       renderPanel(elements.summaryPanel, [
         ["Harness URL", payload.harness_url],
         ["Default Validation Mode", validationModes.default_validation_mode || null],

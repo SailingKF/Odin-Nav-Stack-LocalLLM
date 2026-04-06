@@ -24,6 +24,9 @@ class _FakeHarnessRuntime:
             "status": "passed",
             "validation_mode": "live_runtime",
             "route_completed": True,
+            "latest_pose": {"x": 9.5, "y": -0.5, "label": "tour_bot"},
+            "recent_triggered_spot_ids": ["gate", "plaza", "gallery"],
+            "recent_narrated_spot_ids": ["gate", "plaza", "gallery"],
             "validation_asset_identity": {
                 "config_name": "sim_harness.yaml",
                 "world_file": "content/sim/mvsim/worlds/odin_live_multistop_tour.world.xml",
@@ -161,6 +164,38 @@ class _FakeHarnessRuntime:
                 "latest_session_id": None,
                 "followup_question_ok": False,
                 "debug_available": True,
+            },
+            "validation_map_view": {
+                "status": "ready",
+                "rendering_strategy": "schematic_svg_topdown_view",
+                "active_validation_mode": "live_runtime",
+                "data_sources": {
+                    "route_file": "content/routes/demo_route.yaml",
+                    "poi_file": "content/poi/demo_pois.yaml",
+                    "pose_source": "latest_report",
+                    "progress_source": "latest_report",
+                },
+                "pose": {
+                    "world": {"x": 9.5, "y": -0.5, "label": "tour_bot"},
+                    "screen": {"x": 88.0, "y": 32.0},
+                },
+                "pose_available": True,
+                "recent_triggered_spot_ids": ["gate", "plaza", "gallery"],
+                "recent_narrated_spot_ids": ["gate", "plaza", "gallery"],
+                "poi_count": 3,
+                "poi_markers": [
+                    {"spot_id": "gate", "spot_name": "East Gate", "order_index": 1, "world": {"x": 0.0, "y": 0.0, "trigger_radius": 1.2}, "screen": {"x": 10.0, "y": 40.0}, "visual_status": "narrated"},
+                    {"spot_id": "plaza", "spot_name": "Central Plaza", "order_index": 2, "world": {"x": 5.0, "y": 1.0, "trigger_radius": 1.0}, "screen": {"x": 50.0, "y": 28.0}, "visual_status": "narrated"},
+                    {"spot_id": "gallery", "spot_name": "History Gallery", "order_index": 3, "world": {"x": 9.5, "y": -0.5, "trigger_radius": 1.1}, "screen": {"x": 88.0, "y": 32.0}, "visual_status": "active"},
+                ],
+                "route_polyline": [
+                    {"spot_id": "gate", "x": 10.0, "y": 40.0},
+                    {"spot_id": "plaza", "x": 50.0, "y": 28.0},
+                    {"spot_id": "gallery", "x": 88.0, "y": 32.0},
+                ],
+                "view_box": {"width": 100.0, "height": 64.0, "padding": 8.0},
+                "world_bounds": {"min_x": -1.0, "max_x": 10.5, "min_y": -1.5, "max_y": 2.0},
+                "normalization": {"screen_y_axis": "inverted_from_world_positive_up"},
             },
             "last_validation_result": None,
             "latest_report": self._latest_report,
@@ -344,6 +379,7 @@ class MVSimValidationHarnessTests(unittest.TestCase):
         self.assertEqual(status["validation_modes"]["selected_validation_mode"], "live_runtime")
         self.assertIn("compatibility_shim", status["validation_modes"]["available"])
         self.assertIn("live_runtime", status["validation_modes"]["available"])
+        self.assertIn("validation_map_view", status)
         self.assertEqual(
             status["service_checks"]["api_server"]["target_url"],
             "http://127.0.0.1:8001/health",
@@ -376,14 +412,17 @@ class MVSimValidationHarnessTests(unittest.TestCase):
         self.assertIn("Run MVSim Validation", page.text)
         self.assertIn("Configured MVSim Mode", page.text)
         self.assertIn("Validation Mode", page.text)
+        self.assertIn("Validation Map", page.text)
         self.assertIn("Live Vs Compatibility", page.text)
         self.assertIn("Latest Report", page.text)
         self.assertIn("Recent Runs", page.text)
         self.assertIn("Comparability", page.text)
         self.assertIn("Export Latest Comparison", page.text)
+        self.assertIn("Pending POI", page.text)
         self.assertIn("Open Human Export", page.text)
         self.assertEqual(status.status_code, 200)
         self.assertEqual(status.json()["service"], "mvsim-validation-harness")
+        self.assertEqual(status.json()["validation_map_view"]["status"], "ready")
         self.assertTrue(start.json()["ok"])
         self.assertEqual(start.json()["validation_mode"], "live_runtime")
         self.assertEqual(validation.json()["status"], "passed")

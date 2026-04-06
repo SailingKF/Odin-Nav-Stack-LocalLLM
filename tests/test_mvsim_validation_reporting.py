@@ -42,6 +42,7 @@ class MVSimValidationReportingTests(unittest.TestCase):
                     ],
                     "proxy_target": "http://127.0.0.1:8110",
                 },
+                "api_state": {"last_pose": {"x": 9.5, "y": -0.5, "label": "tour_bot"}},
                 "live_validation_summary": {
                     "live_first_poi_hit_occurred": True,
                     "live_second_poi_hit_occurred": True,
@@ -71,6 +72,7 @@ class MVSimValidationReportingTests(unittest.TestCase):
         self.assertTrue(report["live_second_poi_hit_occurred"])
         self.assertTrue(report["route_completed"])
         self.assertEqual(report["recent_triggered_spot_ids"], ["gate", "plaza", "gallery"])
+        self.assertEqual(report["latest_pose"]["x"], 9.5)
         self.assertEqual(report["service_targets"]["api_server"], "http://127.0.0.1:8001/health")
         self.assertEqual(
             report["validation_asset_identity"]["world_file"],
@@ -259,6 +261,7 @@ class MVSimValidationReportingTests(unittest.TestCase):
                     "status": "passed",
                     "passed": True,
                     "route_completed": True,
+                    "latest_pose": {"x": 9.5, "y": -0.5},
                     "recent_triggered_spot_ids": ["gate", "plaza"],
                     "recent_narrated_spot_ids": ["gate", "plaza"],
                     "validation_asset_identity": {"world_file": "world.xml", "vehicle_name": "tour_bot"},
@@ -268,6 +271,7 @@ class MVSimValidationReportingTests(unittest.TestCase):
                     "status": "passed",
                     "passed": True,
                     "route_completed": True,
+                    "latest_pose": {"x": 9.5, "y": -0.5},
                     "recent_triggered_spot_ids": ["gate", "plaza"],
                     "recent_narrated_spot_ids": ["gate", "plaza"],
                     "validation_asset_identity": {"world_file": "world.xml", "vehicle_name": "tour_bot"},
@@ -281,6 +285,7 @@ class MVSimValidationReportingTests(unittest.TestCase):
         self.assertIn("## Guardrail Reasons", markdown)
         self.assertIn("## Live Runtime Report", markdown)
         self.assertIn("## Compatibility Shim Report", markdown)
+        self.assertIn("Latest Pose", markdown)
 
     def test_build_latest_mode_comparison_marks_mismatched_assets_not_directly_comparable(self) -> None:
         summary = build_latest_mode_comparison(

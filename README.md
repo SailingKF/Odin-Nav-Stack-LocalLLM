@@ -1191,6 +1191,29 @@ Round 042 human-readable comparison export baseline:
 - the Markdown export stays intentionally compact and includes:
   - comparison status
   - comparability status
+
+Round 043 lightweight 2D validation map baseline:
+- the harness now renders a schematic top-down validation map directly on `/harness`
+- the map uses existing route and POI assets plus truthful runtime/report state only
+- it shows:
+  - route POI order
+  - current or last known pose
+  - recently triggered POIs
+  - recently narrated POIs
+  - the active validation mode behind the visible progression
+- coordinate normalization stays local to the harness view layer:
+  - no GIS layer
+  - no occupancy map
+  - no generic scene engine
+- pose sourcing is explicit:
+  - prefer current reachable API `/state`
+  - fall back to the latest persisted harness report pose
+
+What this lets an operator do now:
+- open `/harness`
+- see where the current route POIs sit relative to each other
+- confirm whether the latest pose is still near the expected stop
+- visually distinguish pending, triggered, narrated, and active POIs without replaying the whole log mentally
   - guardrail reasons
   - compact live/compatibility report summaries
   - compared outcome flags

@@ -110,6 +110,19 @@ With the live-harness baseline, the harness can now also truthfully show:
   - compatibility replay
   - truthful live MVSim pose relay
 
+The harness now also includes a lightweight 2D validation map:
+
+- route POIs are rendered from the configured route and POI files
+- current or last pose is rendered from the reachable API state when available
+- if no live API pose is reachable, the harness falls back to the latest persisted report pose
+- recent trigger and narration progression is rendered from existing validation/report truth rather than a parallel UI-only model
+
+This map intentionally stays narrow:
+
+- schematic top-down SVG only
+- coordinate normalization is local to the harness view layer
+- no general map framework, occupancy map, or simulator-side rendering contract
+
 ## How Common Problems Are Reported
 
 Current common operator failures are surfaced as:
@@ -169,6 +182,7 @@ Current essentials include:
 - first/second live stop truth
 - recent triggered spots
 - recent narrated spots
+- latest pose when it is available from the validation result
 - debug URL and service targets
 
 Current read surfaces:
@@ -185,6 +199,7 @@ Current read surfaces:
   - `latest_comparison`
   - `latest_comparison_export`
   - `latest_comparison_human_export`
+  - `validation_map_view`
 
 This means an operator can inspect the most recent validation result later without replaying the run.
 It also means the harness can now show a compact latest live-vs-compatibility sanity check without rerunning either path.
