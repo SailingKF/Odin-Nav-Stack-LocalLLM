@@ -14,7 +14,9 @@ from adapters.sim.frame_transform import SimFrameTransformConfig
 from adapters.sim.projection import SimPoseProjectionConfig
 from services.deployment_profile import build_deployment_endpoint_contract, build_deployment_launch_plan
 from services.mvsim_validation_harness.reporting import (
+    ComparisonExportStore,
     ValidationReportStore,
+    build_latest_comparison_export,
     build_latest_mode_comparison,
     build_validation_report,
 )
@@ -155,6 +157,7 @@ class MVSimValidationHarnessRuntime:
         self._runtime_dir = repo_root / "session_logs" / "mvsim_validation_harness"
         self._runtime_dir.mkdir(parents=True, exist_ok=True)
         self._report_store = ValidationReportStore(self._runtime_dir / "reports")
+        self._comparison_export_store = ComparisonExportStore(self._runtime_dir / "comparison_exports")
         self._managed_processes: Dict[str, subprocess.Popen] = {}
         self._last_validation_result: Optional[Dict[str, Any]] = None
 
@@ -263,6 +266,17 @@ class MVSimValidationHarnessRuntime:
             latest_live_report=latest_live,
             latest_compatibility_report=latest_compatibility,
         )
+
+    def latest_comparison_export(self) -> Optional[Dict[str, Any]]:
+        return self._comparison_export_store.read_latest_export()
+
+    def export_latest_comparison_summary(self) -> Dict[str, Any]:
+        comparison_summary = self.latest_comparison_summary()
+        export_payload = build_latest_comparison_export(
+            comparison_summary,
+            harness_url=self._harness_url,
+        )
+        return self._comparison_export_store.write_export(export_payload)
 
     def _persist_validation_report(self, validation_result: Dict[str, Any], service_specs: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
         active_config = self._config_for_validation_mode(
@@ -402,6 +416,7 @@ class MVSimValidationHarnessRuntime:
             "latest_report": self.latest_report(),
             "recent_reports": self.recent_reports(),
             "latest_comparison": self.latest_comparison_summary(),
+            "latest_comparison_export": self.latest_comparison_export(),
         }
 
     def _wait_for_service(

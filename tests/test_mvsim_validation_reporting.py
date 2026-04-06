@@ -3,7 +3,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from services.mvsim_validation_harness.reporting import (
+    ComparisonExportStore,
     ValidationReportStore,
+    build_latest_comparison_export,
     build_latest_mode_comparison,
     build_validation_report,
 )
@@ -105,6 +107,30 @@ class MVSimValidationReportingTests(unittest.TestCase):
         self.assertEqual(recent[0]["report_id"], "20260406T120100Z-live_runtime")
         self.assertEqual(recent[1]["report_id"], "20260406T120000Z-compatibility_shim")
 
+    def test_comparison_export_store_persists_latest_export(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            store = ComparisonExportStore(Path(temp_dir))
+            first = store.write_export(
+                {
+                    "export_id": "20260406T120000Z-latest_comparison_export",
+                    "comparison_status": "missing_reports",
+                    "comparability_status": "unknown",
+                }
+            )
+            second = store.write_export(
+                {
+                    "export_id": "20260406T120100Z-latest_comparison_export",
+                    "comparison_status": "ready",
+                    "comparability_status": "comparable",
+                }
+            )
+
+            latest = store.read_latest_export()
+
+        self.assertEqual(first["comparison_status"], "missing_reports")
+        self.assertEqual(second["comparability_status"], "comparable")
+        self.assertEqual(latest["export_id"], "20260406T120100Z-latest_comparison_export")
+
     def test_build_latest_mode_comparison_handles_both_modes(self) -> None:
         summary = build_latest_mode_comparison(
             latest_live_report={
@@ -164,6 +190,54 @@ class MVSimValidationReportingTests(unittest.TestCase):
         self.assertEqual(summary["status"], "missing_reports")
         self.assertFalse(summary["comparison_available"])
         self.assertEqual(summary["missing_modes"], ["live_runtime"])
+
+    def test_build_latest_comparison_export_keeps_high_signal_fields(self) -> None:
+        export_payload = build_latest_comparison_export(
+            {
+                "status": "ready",
+                "comparison_available": True,
+                "comparability_status": "comparable",
+                "missing_modes": [],
+                "guardrail_reasons": ["required validation assets match across the latest live and compatibility reports"],
+                "live_runtime_report": {
+                    "report_id": "live-1",
+                    "validation_asset_identity": {"world_file": "world.xml"},
+                },
+                "compatibility_shim_report": {
+                    "report_id": "compat-1",
+                    "validation_asset_identity": {"world_file": "world.xml"},
+                },
+                "differences": {"triggered_spots_equal": True},
+            },
+            harness_url="http://127.0.0.1:8304",
+        )
+
+        self.assertEqual(export_payload["export_kind"], "latest_live_vs_compatibility_comparison")
+        self.assertEqual(export_payload["comparison_status"], "ready")
+        self.assertEqual(export_payload["comparability_status"], "comparable")
+        self.assertEqual(export_payload["live_runtime_report"]["report_id"], "live-1")
+        self.assertEqual(export_payload["compatibility_shim_report"]["report_id"], "compat-1")
+        self.assertTrue(export_payload["differences"]["triggered_spots_equal"])
+
+    def test_build_latest_comparison_export_keeps_missing_report_state_explicit(self) -> None:
+        export_payload = build_latest_comparison_export(
+            {
+                "status": "missing_reports",
+                "comparison_available": False,
+                "comparability_status": "unknown",
+                "missing_modes": ["compatibility_shim"],
+                "guardrail_reasons": [],
+                "live_runtime_report": {"report_id": "live-1"},
+                "compatibility_shim_report": None,
+                "differences": {},
+            },
+            harness_url="http://127.0.0.1:8304",
+        )
+
+        self.assertEqual(export_payload["comparison_status"], "missing_reports")
+        self.assertEqual(export_payload["missing_modes"], ["compatibility_shim"])
+        self.assertFalse(export_payload["comparison_available"])
+        self.assertIsNone(export_payload["compatibility_shim_report"])
 
     def test_build_latest_mode_comparison_marks_mismatched_assets_not_directly_comparable(self) -> None:
         summary = build_latest_mode_comparison(

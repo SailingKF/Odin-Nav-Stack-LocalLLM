@@ -78,6 +78,14 @@ def create_app(
     def compare_reports() -> dict:
         return {"latest_comparison": active_runtime.latest_comparison_summary()}
 
+    @app.post("/reports/compare/export")
+    def export_compare_report() -> dict:
+        return {"latest_comparison_export": active_runtime.export_latest_comparison_summary()}
+
+    @app.get("/reports/compare/export/latest")
+    def latest_comparison_export() -> dict:
+        return {"latest_comparison_export": active_runtime.latest_comparison_export()}
+
     @app.get("/debug-link")
     def debug_link() -> dict:
         return {"debug_url": active_runtime.debug_url}

@@ -16,6 +16,10 @@ Reports are stored under:
 
 - `session_logs/mvsim_validation_harness/reports/`
 
+Latest comparison export artifacts are stored under:
+
+- `session_logs/mvsim_validation_harness/comparison_exports/`
+
 Each completed harness validation writes one JSON file.
 
 Current file naming shape:
@@ -112,6 +116,8 @@ The harness now exposes report data through:
 - `GET /reports/latest`
 - `GET /reports/recent`
 - `GET /reports/compare`
+- `POST /reports/compare/export`
+- `GET /reports/compare/export/latest`
 
 The harness status surface also includes:
 
@@ -120,6 +126,36 @@ The harness status surface also includes:
 - `latest_comparison`
 
 This lets an operator inspect the last run without replaying the session.
+
+## Latest Comparison Export Artifact
+
+The harness can now also persist a stable export artifact for the latest already-computed comparison summary.
+
+The export stays intentionally small and file-backed.
+
+Current export fields include:
+
+- `export_id`
+- `created_at`
+- `export_kind`
+- `export_version`
+- `harness_url`
+- `comparison_status`
+- `comparison_available`
+- `comparability_status`
+- `missing_modes`
+- `guardrail_reasons`
+- `live_runtime_report`
+- `compatibility_shim_report`
+- `differences`
+
+This export is generated from the latest persisted comparison inputs only.
+
+It does not:
+
+- rerun validation
+- recompute from raw event logs
+- broaden into a separate report-generation system
 
 ## Latest Live Vs Compatibility Comparison
 

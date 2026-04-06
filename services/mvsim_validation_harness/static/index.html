@@ -55,6 +55,8 @@
         <div class="button-grid">
           <button id="startStack" class="primary" type="button">Start / Attach Local Stack</button>
           <button id="runValidation" class="secondary" type="button">Run MVSim Validation</button>
+          <button id="exportComparison" class="ghost" type="button">Export Latest Comparison</button>
+          <a id="openLatestExport" class="button-link ghost" href="#" target="_blank" rel="noopener noreferrer">Open Latest Export</a>
           <button id="refreshStatus" class="ghost" type="button">Refresh Status</button>
           <button id="stopStack" class="warning" type="button">Stop Started Services</button>
           <a id="openDebug" class="button-link primary" href="#" target="_blank" rel="noopener noreferrer">Open /debug</a>
@@ -88,6 +90,7 @@
       recentReportsPanel: document.getElementById("recentReportsPanel"),
       questionInput: document.getElementById("questionInput"),
       openDebug: document.getElementById("openDebug"),
+      openLatestExport: document.getElementById("openLatestExport"),
       modeSelect: document.getElementById("modeSelect"),
     };
     function setFeedback(message, isError=false) { elements.feedback.textContent = message; elements.feedback.classList.toggle("error", Boolean(isError)); }
@@ -128,6 +131,7 @@
       const latestReport = payload.latest_report || {};
       const recentReports = payload.recent_reports || [];
       const comparison = payload.latest_comparison || {};
+      const latestComparisonExport = payload.latest_comparison_export || {};
       const validationModes = payload.validation_modes || {};
       if (Array.isArray(validationModes.available) && validationModes.available.length) {
         elements.modeSelect.innerHTML = "";
@@ -142,6 +146,7 @@
         elements.modeSelect.value = validationModes.selected_validation_mode;
       }
       elements.openDebug.href = payload.debug_url || "#";
+      elements.openLatestExport.href = latestComparisonExport.export_id ? "/reports/compare/export/latest" : "#";
       renderPanel(elements.summaryPanel, [
         ["Harness URL", payload.harness_url],
         ["Default Validation Mode", validationModes.default_validation_mode || null],
@@ -164,6 +169,7 @@
         ["Latest Spot", snapshot.latest_spot_name],
         ["Follow-up Question", snapshot.followup_question_ok, snapshot.followup_question_ok ? "ok" : "warn"],
         ["Debug Available", snapshot.debug_available, snapshot.debug_available ? "ok" : "warn"],
+        ["Latest Comparison Export", latestComparisonExport.export_id || null, latestComparisonExport.export_id ? "ok" : "warn"],
       ]);
       renderPanel(elements.servicePanel, Object.values(serviceChecks).map(item => [
         item.display_name, `${item.status} | ${item.detail}`, item.status==="healthy" ? "ok" : item.status==="port_conflict" ? "warn" : "fail"
@@ -196,6 +202,7 @@
         ["Triggered Spots Equal", comparison.differences ? comparison.differences.triggered_spots_equal : null, comparison.differences && comparison.differences.triggered_spots_equal ? "ok" : comparison.comparison_available ? "warn" : null],
         ["Narrated Spots Equal", comparison.differences ? comparison.differences.narrated_spots_equal : null, comparison.differences && comparison.differences.narrated_spots_equal ? "ok" : comparison.comparison_available ? "warn" : null],
         ["Latest Spot Equal", comparison.differences ? comparison.differences.latest_spot_name_equal : null, comparison.differences && comparison.differences.latest_spot_name_equal ? "ok" : comparison.comparison_available ? "warn" : null],
+        ["Latest Export Path", latestComparisonExport.export_path || null],
       ]);
       renderPanel(elements.latestReportPanel, [
         ["Report ID", latestReport.report_id || null],
@@ -220,10 +227,12 @@
     async function startStack() { try { const payload = await callApi("/services/start", "POST", { validation_mode: selectedValidationMode() }); setFeedback(payload.ok ? `Local stack is ready for ${payload.validation_mode}.` : "Local stack could not be prepared.", !payload.ok); await refreshStatus(); } catch (error) { setFeedback(`Start/attach failed: ${error.message}`, true); } }
     async function stopStack() { try { const payload = await callApi("/services/stop", "POST"); setFeedback(`Stopped services: ${(payload.stopped_services || []).join(", ") || "none"}`); await refreshStatus(); } catch (error) { setFeedback(`Stop failed: ${error.message}`, true); } }
     async function runValidation() { try { const payload = await callApi("/validation/run", "POST", { validation_mode: selectedValidationMode(), question: elements.questionInput.value.trim() || "What does this final stop prove?" }); setFeedback(payload.status==="passed" ? `Validation passed in ${payload.validation_mode}.` : `Validation finished with status: ${payload.status}`, payload.status!=="passed"); await refreshStatus(); } catch (error) { setFeedback(`Validation failed: ${error.message}`, true); } }
+    async function exportComparison() { try { const payload = await callApi("/reports/compare/export", "POST"); const artifact = payload.latest_comparison_export || {}; setFeedback(artifact.export_id ? `Comparison exported: ${artifact.export_id}` : "Comparison export completed."); await refreshStatus(); } catch (error) { setFeedback(`Comparison export failed: ${error.message}`, true); } }
     document.getElementById("refreshStatus").addEventListener("click", refreshStatus);
     document.getElementById("startStack").addEventListener("click", startStack);
     document.getElementById("stopStack").addEventListener("click", stopStack);
     document.getElementById("runValidation").addEventListener("click", runValidation);
+    document.getElementById("exportComparison").addEventListener("click", exportComparison);
     refreshStatus();
   </script>
 </body>

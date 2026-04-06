@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 
 
 IDENTITY_VERSION = "validation_asset_identity.v1"
+COMPARISON_EXPORT_VERSION = "latest_comparison_export.v1"
 _REQUIRED_IDENTITY_FIELDS = (
     "route_file",
     "poi_file",
@@ -179,6 +180,33 @@ def _compact_report_view(report: Optional[Dict[str, Any]]) -> Optional[Dict[str,
     }
 
 
+def build_latest_comparison_export(
+    comparison_summary: Dict[str, Any],
+    *,
+    harness_url: str,
+) -> Dict[str, Any]:
+    export_id = f"{_utc_timestamp_slug()}-latest_comparison_export"
+    return {
+        "export_id": export_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "export_kind": "latest_live_vs_compatibility_comparison",
+        "export_version": COMPARISON_EXPORT_VERSION,
+        "harness_url": harness_url,
+        "comparison_status": comparison_summary.get("status"),
+        "comparison_available": bool(comparison_summary.get("comparison_available")),
+        "comparability_status": comparison_summary.get("comparability_status"),
+        "missing_modes": list(comparison_summary.get("missing_modes") or []),
+        "guardrail_reasons": list(comparison_summary.get("guardrail_reasons") or []),
+        "live_runtime_report": _json_copy(comparison_summary.get("live_runtime_report"))
+        if comparison_summary.get("live_runtime_report") is not None
+        else None,
+        "compatibility_shim_report": _json_copy(comparison_summary.get("compatibility_shim_report"))
+        if comparison_summary.get("compatibility_shim_report") is not None
+        else None,
+        "differences": _json_copy(comparison_summary.get("differences")),
+    }
+
+
 def build_latest_mode_comparison(
     latest_live_report: Optional[Dict[str, Any]],
     latest_compatibility_report: Optional[Dict[str, Any]],
@@ -341,3 +369,33 @@ class ValidationReportStore:
             if report.get("validation_mode") == validation_mode:
                 return report
         return None
+
+
+class ComparisonExportStore:
+    def __init__(self, root_dir: Path) -> None:
+        self._root_dir = root_dir
+        self._root_dir.mkdir(parents=True, exist_ok=True)
+
+    def _export_path(self, export_id: str) -> Path:
+        return self._root_dir / f"{export_id}.json"
+
+    def write_export(self, export_payload: Dict[str, Any]) -> Dict[str, Any]:
+        export_id = str(export_payload["export_id"])
+        path = self._export_path(export_id)
+        with path.open("w", encoding="utf-8") as handle:
+            json.dump(export_payload, handle, ensure_ascii=False, indent=2)
+        persisted = dict(export_payload)
+        persisted["export_path"] = str(path)
+        return persisted
+
+    def _load_export(self, path: Path) -> Dict[str, Any]:
+        with path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        payload["export_path"] = str(path)
+        return payload
+
+    def read_latest_export(self) -> Optional[Dict[str, Any]]:
+        files = sorted(self._root_dir.glob("*.json"))
+        if not files:
+            return None
+        return self._load_export(files[-1])

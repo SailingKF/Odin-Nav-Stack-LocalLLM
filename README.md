@@ -1165,6 +1165,23 @@ Current fields used for direct comparability are:
 
 Config identity such as `config_name` / `config_path` stays visible, but is treated as operator context and warning-only metadata rather than a hard blocker by itself.
 
+Round 041 latest-comparison export baseline:
+- the harness can now export the latest already-computed live-vs-compatibility comparison as a stable JSON artifact
+- export artifacts are stored under:
+  - `session_logs/mvsim_validation_harness/comparison_exports/`
+- current export APIs are:
+  - `POST /reports/compare/export`
+  - `GET /reports/compare/export/latest`
+- the export keeps only high-signal operator fields:
+  - comparison status
+  - comparability status
+  - guardrail reasons
+  - compact live/compatibility report identities
+  - compared outcome flags
+- the harness page now includes:
+  - `Export Latest Comparison`
+  - `Open Latest Export`
+
 Focused docs:
 - `docs/MVSIM_LIVE_RUNTIME_BRINGUP.md`
 - `docs/MVSIM_LIVE_POSE_BRIDGE.md`
