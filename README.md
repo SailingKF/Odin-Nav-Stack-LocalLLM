@@ -935,6 +935,42 @@ Open the debug page:
 Focused doc:
 - `docs/MVSIM_MINIMAL_INTEGRATION.md`
 
+## MVSim Guided Validation Harness
+
+This iteration adds a PC-only operator validation harness so a human can validate the current MVSim compatibility path from one local page instead of coordinating multiple terminals and ad hoc API calls.
+
+What is included:
+- a local harness runtime in `services/mvsim_validation_harness/`
+- a simple local page at `/harness`
+- narrow attach-or-launch behavior for:
+  - sim pose ingress
+  - sim-profile API server
+- one-click MVSim validation that runs the bridge demo and summarizes:
+  - service health
+  - `/debug` reachability
+  - route completion
+  - latest session id
+  - latest narration
+  - follow-up question result
+
+Easiest human flow:
+```shell
+python scripts/run_mvsim_validation_harness.py --config configs/sim.yaml --open-browser
+```
+
+Then use the local page:
+- `Start / Attach Local Stack`
+- `Run MVSim Validation`
+- `Open /debug`
+
+What this harness is not:
+- not a general supervisor
+- not a packaging/service-manager layer
+- not direct live MVSim integration
+
+Focused doc:
+- `docs/MVSIM_VALIDATION_HARNESS.md`
+
 How to validate the service-backed path:
 ```shell
 python scripts/run_mock_tour.py

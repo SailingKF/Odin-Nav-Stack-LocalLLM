@@ -1,0 +1,155 @@
+import unittest
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from services.mvsim_validation_harness.app import create_app
+from services.mvsim_validation_harness.runtime import (
+    MVSimValidationHarnessRuntime,
+    build_operator_service_check,
+    summarize_validation_snapshot,
+)
+
+
+class _FakeHarnessRuntime:
+    debug_url = "http://127.0.0.1:8000/debug"
+
+    def __init__(self) -> None:
+        self._status = {
+            "status": "ok",
+            "service": "mvsim-validation-harness",
+            "harness_url": "http://127.0.0.1:8300",
+            "config_path": "configs/sim.yaml",
+            "debug_url": self.debug_url,
+            "supports_attach_existing": True,
+            "supports_local_launch": True,
+            "service_checks": {
+                "sim_pose_ingress": build_operator_service_check(
+                    "sim_pose_ingress_server",
+                    "Sim Pose Ingress",
+                    "http://127.0.0.1:8100/health",
+                    True,
+                    "attach_existing",
+                    "health endpoint reachable",
+                ),
+                "api_server": build_operator_service_check(
+                    "api_server",
+                    "Sim API Proxy",
+                    "http://127.0.0.1:8000/health",
+                    True,
+                    "attach_existing",
+                    "health endpoint reachable",
+                ),
+                "debug_page": build_operator_service_check(
+                    "debug_page",
+                    "Debug Page",
+                    self.debug_url,
+                    True,
+                    "attach_existing",
+                    "debug page reachable",
+                ),
+            },
+            "validation_snapshot": {
+                "overall_status": "idle",
+                "route_completed": False,
+                "latest_spot_name": None,
+                "latest_narration_text": None,
+                "latest_session_id": None,
+                "followup_question_ok": False,
+                "debug_available": True,
+            },
+            "last_validation_result": None,
+        }
+
+    def status(self) -> dict:
+        return self._status
+
+    def start_local_stack(self) -> dict:
+        return {"ok": True, "action": "start_local_stack", "service_checks": self._status["service_checks"], "debug_url": self.debug_url}
+
+    def stop_local_stack(self) -> dict:
+        return {"ok": True, "action": "stop_local_stack", "stopped_services": ["sim_pose_ingress_server", "api_server"]}
+
+    def run_validation(self, question: str) -> dict:
+        result = {
+            "status": "passed",
+            "mvsim_source": {"source_kind": "mvsim_compatibility_shim"},
+            "sim_ingress_state": {"route_completed": True},
+            "api_latest_session": {
+                "session_id": "mock_tour_123",
+                "latest_spot_name": "History Gallery",
+                "latest_narration_text": "Final stop narration.",
+            },
+            "question_result": {
+                "ok": True,
+                "answer_text": f"Answered: {question}",
+            },
+        }
+        self._status["last_validation_result"] = result
+        self._status["validation_snapshot"] = summarize_validation_snapshot(
+            self._status["service_checks"]["sim_pose_ingress"],
+            self._status["service_checks"]["api_server"],
+            self._status["service_checks"]["debug_page"],
+            result,
+        )
+        return result
+
+
+class MVSimValidationHarnessTests(unittest.TestCase):
+    def test_runtime_normalizes_relative_config_path_for_cli_startup(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        runtime = MVSimValidationHarnessRuntime(
+            config_path=Path("configs/sim.yaml"),
+            repo_root=repo_root,
+        )
+
+        self.assertTrue(runtime._config_path.is_absolute())
+        self.assertEqual(runtime._config_path, repo_root / "configs" / "sim.yaml")
+
+    def test_snapshot_summary_marks_passed_when_core_checks_pass(self) -> None:
+        sim_check = build_operator_service_check("sim", "Sim", "http://127.0.0.1:8100/health", True, "attach_existing", "ok")
+        api_check = build_operator_service_check("api", "API", "http://127.0.0.1:8000/health", True, "attach_existing", "ok")
+        debug_check = build_operator_service_check("debug", "Debug", "http://127.0.0.1:8000/debug", True, "attach_existing", "ok")
+        validation = {
+            "sim_ingress_state": {"route_completed": True},
+            "api_latest_session": {"session_id": "mock_tour_1", "latest_spot_name": "History Gallery", "latest_narration_text": "Done"},
+            "question_result": {"ok": True},
+        }
+
+        snapshot = summarize_validation_snapshot(sim_check, api_check, debug_check, validation)
+
+        self.assertEqual(snapshot["overall_status"], "passed")
+        self.assertTrue(snapshot["route_completed"])
+        self.assertEqual(snapshot["latest_session_id"], "mock_tour_1")
+
+    def test_snapshot_summary_stays_idle_before_validation(self) -> None:
+        sim_check = build_operator_service_check("sim", "Sim", "url", False, "attach_existing", "not running")
+        api_check = build_operator_service_check("api", "API", "url", False, "attach_existing", "not running")
+        debug_check = build_operator_service_check("debug", "Debug", "url", False, "attach_existing", "not running")
+
+        snapshot = summarize_validation_snapshot(sim_check, api_check, debug_check, None)
+
+        self.assertEqual(snapshot["overall_status"], "idle")
+        self.assertFalse(snapshot["debug_available"])
+
+    def test_harness_page_and_actions_are_served(self) -> None:
+        client = TestClient(create_app(runtime=_FakeHarnessRuntime()))
+
+        page = client.get("/harness")
+        status = client.get("/status")
+        start = client.post("/services/start")
+        validation = client.post("/validation/run", json={"question": "What does this final stop prove?"})
+        debug_link = client.get("/debug-link")
+
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("MVSim Validation Harness", page.text)
+        self.assertIn("Run MVSim Validation", page.text)
+        self.assertEqual(status.status_code, 200)
+        self.assertEqual(status.json()["service"], "mvsim-validation-harness")
+        self.assertTrue(start.json()["ok"])
+        self.assertEqual(validation.json()["status"], "passed")
+        self.assertEqual(debug_link.json()["debug_url"], "http://127.0.0.1:8000/debug")
+
+
+if __name__ == "__main__":
+    unittest.main()
