@@ -60,6 +60,9 @@ mvsim_integration:
   wsl_distribution: Ubuntu
   wsl_user: root
   wsl_executable_path: /root/round033-mvsim-build/bin/mvsim
+  live_pose_topic: /tour_bot/pose
+  live_pose_message_type: mvsim_msgs.TimeStampedPose
+  live_bridge_mode: wsl_topic_echo_to_http_ingress
   world_file: content/sim/mvsim/worlds/odin_minimal_tour.world.xml
   observation_file: content/sim/demo_mvsim_pose_stream.yaml
   assumed_frame_id: map

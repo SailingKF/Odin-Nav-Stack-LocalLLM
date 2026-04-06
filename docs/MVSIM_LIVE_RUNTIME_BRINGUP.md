@@ -109,7 +109,7 @@ What is **not** true yet:
 
 - there is still no Windows-native `mvsim.exe`
 - the validated live runtime currently lives in WSL, not on the Windows PATH
-- the live pose bridge from that running Linux MVSim process into the existing Windows-side stack has not been implemented yet
+- only a minimal live pose bridge baseline exists so far; full live route progression is not implemented yet
 
 ## Round 031 Retry Findings
 
@@ -269,6 +269,38 @@ So the world asset is now aligned with the current Linux-side MVSim parser contr
 
 This does not switch the validated end-to-end sim flow away from the compatibility shim.
 It only records the truthful location of the live MVSim runtime for the next bridge step.
+
+## Round 034 Live Pose Surface Discovery
+
+The next narrow integration seam was validated against the real WSL runtime.
+
+Discovered live pose surface:
+
+- topic:
+  - `/tour_bot/pose`
+- type:
+  - `mvsim_msgs.TimeStampedPose`
+- observed publisher:
+  - `World`
+- observed rate:
+  - about `9.6 Hz`
+
+The current minimal bridge uses:
+
+- `wsl.exe ... mvsim topic echo /tour_bot/pose`
+
+and parses:
+
+- `objectId`
+- `pose.x`
+- `pose.y`
+- `pose.yaw`
+
+into the existing Windows-side `sim_pose_ingress` shape.
+
+Focused bridge doc:
+
+- `docs/MVSIM_LIVE_POSE_BRIDGE.md`
 
 ## Exact Blocker Behavior
 

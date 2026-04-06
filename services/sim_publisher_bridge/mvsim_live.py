@@ -141,6 +141,13 @@ def probe_mvsim_live_runtime(config: Dict[str, Any], repo_root: Path) -> Dict[st
     world_file = str(mvsim_config.get("world_file", "")).strip()
     world_path = resolve_repo_relative_path(world_file, repo_root) if world_file else None
     world_exists = bool(world_path and world_path.exists())
+    live_pose_topic = str(mvsim_config.get("live_pose_topic", "/tour_bot/pose")).strip() or "/tour_bot/pose"
+    live_pose_message_type = str(
+        mvsim_config.get("live_pose_message_type", "mvsim_msgs.TimeStampedPose")
+    ).strip() or "mvsim_msgs.TimeStampedPose"
+    live_bridge_mode = str(
+        mvsim_config.get("live_bridge_mode", "wsl_topic_echo_to_http_ingress")
+    ).strip() or "wsl_topic_echo_to_http_ingress"
     resolved_executable = shutil.which(executable)
     wsl_enablement = probe_wsl_enablement()
     runtime_check = None
@@ -233,6 +240,12 @@ def probe_mvsim_live_runtime(config: Dict[str, Any], repo_root: Path) -> Dict[st
         "launch_command": launch_command,
         "vehicle_name": mvsim_config.get("vehicle_name"),
         "assumed_frame_id": mvsim_config.get("assumed_frame_id", "map"),
+        "live_pose_surface": {
+            "surface_kind": "mvsim_cli_topic",
+            "topic_name": live_pose_topic,
+            "message_type": live_pose_message_type,
+            "bridge_mode": live_bridge_mode,
+        },
         "blocker": blocker,
     }
 

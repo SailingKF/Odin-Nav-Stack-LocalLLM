@@ -1000,6 +1000,7 @@ Current state on this PC:
 - a real Linux-side `mvsim` runtime now exists in Ubuntu 24.04 on WSL2
 - the repo-local world launches in `--headless` mode from that WSL runtime
 - the harness can now show `live_runtime_available: true` even while the validated end-to-end sim path still uses the compatibility shim
+- the next seam is no longer runtime install, but live pose extraction and relay
 
 Linux-side enablement summary on this PC:
 - WSL2 and Ubuntu are installed and runnable
@@ -1031,6 +1032,33 @@ wsl.exe -d Ubuntu -u root -- bash -lc "/root/round033-mvsim-build/bin/mvsim laun
 Next narrow step after this round:
 - inspect the live MVSim pose output surface from the running Linux process
 - bridge that output into the existing Windows-side sim-ingress path
+
+Round 034 live pose discovery and bridge baseline:
+- discovered live topic:
+  - `/tour_bot/pose`
+- discovered message type:
+  - `mvsim_msgs.TimeStampedPose`
+- measured publication rate:
+  - about `9.6 Hz`
+- minimal relay path:
+  - `wsl.exe ... mvsim topic echo /tour_bot/pose`
+  - parsed by `services/sim_publisher_bridge/mvsim_live_source.py`
+  - forwarded by `scripts/run_mvsim_live_bridge_demo.py`
+  - consumed by the existing Windows-side `sim_pose_ingress` HTTP bridge
+
+How to run the current minimal live bridge:
+```shell
+python scripts/run_sim_pose_ingress_server.py --config configs/sim.yaml --host 127.0.0.1 --port 8100
+python scripts/run_mvsim_live_bridge_demo.py --config configs/sim.yaml --base-url http://127.0.0.1:8100
+```
+
+The current `sim.yaml` now records:
+- `mvsim_integration.live_pose_topic: /tour_bot/pose`
+- `mvsim_integration.live_bridge_mode: wsl_topic_echo_to_http_ingress`
+
+Focused docs:
+- `docs/MVSIM_LIVE_RUNTIME_BRINGUP.md`
+- `docs/MVSIM_LIVE_POSE_BRIDGE.md`
 
 Focused doc:
 - `docs/MVSIM_LIVE_RUNTIME_BRINGUP.md`

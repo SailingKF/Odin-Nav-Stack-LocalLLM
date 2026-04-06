@@ -84,6 +84,11 @@ class MVSimLiveRuntimeTests(unittest.TestCase):
         self.assertEqual(probe["runtime_host"], "wsl")
         self.assertTrue(probe["runtime_available"])
         self.assertEqual(probe["wsl_distribution"], "Ubuntu")
+        self.assertEqual(probe["live_pose_surface"]["topic_name"], "/tour_bot/pose")
+        self.assertEqual(
+            probe["live_pose_surface"]["bridge_mode"],
+            "wsl_topic_echo_to_http_ingress",
+        )
         self.assertEqual(
             probe["launch_command"][:7],
             ["wsl.exe", "-d", "Ubuntu", "-u", "root", "--", "bash"],

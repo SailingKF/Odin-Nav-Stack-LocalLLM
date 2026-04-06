@@ -84,6 +84,7 @@ With the Round 033 WSL runtime update, the harness can now also truthfully show:
 - that a live MVSim runtime is available in WSL even while the validated end-to-end flow still uses `compatibility_shim`
 - which runtime host is configured for live MVSim bring-up
 - whether the repo-local world asset is already compatible with the current Linux-side MVSim parser
+- which live pose topic and bridge mode are currently configured for the next bridge step
 
 ## How Common Problems Are Reported
 
@@ -120,4 +121,4 @@ It also distinguishes three truths cleanly:
 
 - compatibility shim works now
 - live runtime may already be available in WSL
-- the live pose bridge is still a separate next step
+- a minimal live pose bridge may now be available even if full live route progression is still pending
