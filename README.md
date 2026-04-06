@@ -971,6 +971,35 @@ What this harness is not:
 Focused doc:
 - `docs/MVSIM_VALIDATION_HARNESS.md`
 
+## MVSim Live Runtime Bring-Up Baseline
+
+This iteration makes the distinction between a real live MVSim runtime and the compatibility shim explicit, and it prepares a minimal repo-local world asset for future live bring-up without claiming success when the runtime is missing.
+
+What is included:
+- a live-runtime probe in `services/sim_publisher_bridge/mvsim_live.py`
+- a CLI probe entrypoint in `scripts/print_mvsim_live_probe.py`
+- a minimal repo-local vehicle definition in `content/sim/mvsim/definitions/odin_tour_bot.vehicle.xml`
+- a minimal repo-local world file in `content/sim/mvsim/worlds/odin_minimal_tour.world.xml`
+- harness status fields that now show configured mode, effective mode, and live-runtime availability
+
+How to inspect current live readiness:
+```shell
+python scripts/print_mvsim_live_probe.py --config configs/sim.yaml
+```
+
+What the current sim config expresses:
+- `mvsim_integration.mode: compatibility_shim | live_runtime`
+- `mvsim_integration.executable`
+- `mvsim_integration.world_file`
+
+Current state on this PC:
+- the compatibility shim remains the validated path
+- the live runtime path stops in a blocker state because no real `mvsim` executable was found
+- the harness now shows that blocker clearly instead of pretending live validation passed
+
+Focused doc:
+- `docs/MVSIM_LIVE_RUNTIME_BRINGUP.md`
+
 How to validate the service-backed path:
 ```shell
 python scripts/run_mock_tour.py

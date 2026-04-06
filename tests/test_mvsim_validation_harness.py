@@ -1,9 +1,13 @@
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
+
+import yaml
 
 from fastapi.testclient import TestClient
 
 from services.mvsim_validation_harness.app import create_app
+from services.sim_publisher_bridge.mvsim_live import describe_mvsim_runtime_mode, probe_mvsim_live_runtime
 from services.mvsim_validation_harness.runtime import (
     MVSimValidationHarnessRuntime,
     build_operator_service_check,
@@ -23,6 +27,18 @@ class _FakeHarnessRuntime:
             "debug_url": self.debug_url,
             "supports_attach_existing": True,
             "supports_local_launch": True,
+            "mvsim_mode_summary": {
+                "configured_mode": "compatibility_shim",
+                "effective_mode": "compatibility_shim",
+                "live_runtime": {
+                    "runtime_available": False,
+                    "world_file_exists": True,
+                },
+                "compatibility_source": {
+                    "source_kind": "mvsim_compatibility_shim",
+                    "observation_file_exists": True,
+                },
+            },
             "service_checks": {
                 "sim_pose_ingress": build_operator_service_check(
                     "sim_pose_ingress_server",
@@ -51,6 +67,8 @@ class _FakeHarnessRuntime:
             },
             "validation_snapshot": {
                 "overall_status": "idle",
+                "mvsim_mode": "compatibility_shim",
+                "live_runtime_available": False,
                 "route_completed": False,
                 "latest_spot_name": None,
                 "latest_narration_text": None,
@@ -90,12 +108,57 @@ class _FakeHarnessRuntime:
             self._status["service_checks"]["sim_pose_ingress"],
             self._status["service_checks"]["api_server"],
             self._status["service_checks"]["debug_page"],
+            self._status["mvsim_mode_summary"],
             result,
         )
         return result
 
 
 class MVSimValidationHarnessTests(unittest.TestCase):
+    def test_probe_marks_live_runtime_missing_when_mvsim_not_installed(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        config = {
+            "mvsim_integration": {
+                "mode": "live_runtime",
+                "executable": "definitely_missing_mvsim_binary",
+                "world_file": "content/sim/mvsim/worlds/odin_minimal_tour.world.xml",
+                "vehicle_name": "tour_bot",
+            }
+        }
+
+        probe = probe_mvsim_live_runtime(config, repo_root)
+
+        self.assertEqual(probe["configured_mode"], "live_runtime")
+        self.assertFalse(probe["runtime_available"])
+        self.assertTrue(probe["world_file_exists"])
+        self.assertEqual(probe["blocker"]["code"], "mvsim_executable_not_found")
+
+    def test_live_mode_validation_stops_at_real_runtime_blocker(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "sim_live.yaml"
+            payload = {
+                "env_name": "sim",
+                "service_endpoints": {
+                    "sim_pose_ingress_server": {"bind_host": "127.0.0.1", "connect_host": "127.0.0.1", "port": 8100, "scheme": "http"},
+                    "api_server": {"bind_host": "127.0.0.1", "connect_host": "127.0.0.1", "port": 8000, "scheme": "http"},
+                },
+                "mvsim_integration": {
+                    "mode": "live_runtime",
+                    "executable": "definitely_missing_mvsim_binary",
+                    "world_file": "content/sim/mvsim/worlds/odin_minimal_tour.world.xml",
+                    "vehicle_name": "tour_bot",
+                },
+            }
+            config_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+
+            runtime = MVSimValidationHarnessRuntime(config_path=config_path, repo_root=repo_root)
+            result = runtime.run_validation()
+
+        self.assertEqual(result["status"], "blocked_live_runtime_unavailable")
+        self.assertEqual(result["mvsim_mode"], "blocked_live_runtime")
+        self.assertIn("not found", result["detail"])
+
     def test_runtime_normalizes_relative_config_path_for_cli_startup(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         runtime = MVSimValidationHarnessRuntime(
@@ -111,14 +174,20 @@ class MVSimValidationHarnessTests(unittest.TestCase):
         api_check = build_operator_service_check("api", "API", "http://127.0.0.1:8000/health", True, "attach_existing", "ok")
         debug_check = build_operator_service_check("debug", "Debug", "http://127.0.0.1:8000/debug", True, "attach_existing", "ok")
         validation = {
+            "mvsim_mode": "compatibility_shim",
             "sim_ingress_state": {"route_completed": True},
             "api_latest_session": {"session_id": "mock_tour_1", "latest_spot_name": "History Gallery", "latest_narration_text": "Done"},
             "question_result": {"ok": True},
         }
+        mvsim_mode_summary = {
+            "effective_mode": "compatibility_shim",
+            "live_runtime": {"runtime_available": False},
+        }
 
-        snapshot = summarize_validation_snapshot(sim_check, api_check, debug_check, validation)
+        snapshot = summarize_validation_snapshot(sim_check, api_check, debug_check, mvsim_mode_summary, validation)
 
         self.assertEqual(snapshot["overall_status"], "passed")
+        self.assertEqual(snapshot["mvsim_mode"], "compatibility_shim")
         self.assertTrue(snapshot["route_completed"])
         self.assertEqual(snapshot["latest_session_id"], "mock_tour_1")
 
@@ -126,10 +195,15 @@ class MVSimValidationHarnessTests(unittest.TestCase):
         sim_check = build_operator_service_check("sim", "Sim", "url", False, "attach_existing", "not running")
         api_check = build_operator_service_check("api", "API", "url", False, "attach_existing", "not running")
         debug_check = build_operator_service_check("debug", "Debug", "url", False, "attach_existing", "not running")
+        mvsim_mode_summary = {
+            "effective_mode": "blocked_live_runtime",
+            "live_runtime": {"runtime_available": False},
+        }
 
-        snapshot = summarize_validation_snapshot(sim_check, api_check, debug_check, None)
+        snapshot = summarize_validation_snapshot(sim_check, api_check, debug_check, mvsim_mode_summary, None)
 
         self.assertEqual(snapshot["overall_status"], "idle")
+        self.assertEqual(snapshot["mvsim_mode"], "blocked_live_runtime")
         self.assertFalse(snapshot["debug_available"])
 
     def test_harness_page_and_actions_are_served(self) -> None:
@@ -144,6 +218,7 @@ class MVSimValidationHarnessTests(unittest.TestCase):
         self.assertEqual(page.status_code, 200)
         self.assertIn("MVSim Validation Harness", page.text)
         self.assertIn("Run MVSim Validation", page.text)
+        self.assertIn("Configured MVSim Mode", page.text)
         self.assertEqual(status.status_code, 200)
         self.assertEqual(status.json()["service"], "mvsim-validation-harness")
         self.assertTrue(start.json()["ok"])

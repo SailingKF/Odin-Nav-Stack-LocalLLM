@@ -13,6 +13,7 @@ from adapters.sim.frame_transform import SimFrameTransformConfig
 from adapters.sim.projection import SimPoseProjectionConfig
 from services.deployment_profile import build_deployment_endpoint_contract, build_deployment_launch_plan
 from services.sim_publisher_bridge.http_client import SimIngressHttpClient
+from services.sim_publisher_bridge.mvsim_live import describe_mvsim_runtime_mode
 from services.sim_publisher_bridge.mvsim_source import YamlFileMVSimPoseSource, describe_mvsim_compat_source
 from services.sim_publisher_bridge.runtime import SimulatorPublisherBridgeRuntime
 
@@ -47,11 +48,15 @@ def summarize_validation_snapshot(
     sim_ingress_check: Dict[str, Any],
     api_check: Dict[str, Any],
     debug_check: Dict[str, Any],
+    mvsim_mode_summary: Dict[str, Any],
     validation_result: Optional[Dict[str, Any]],
 ) -> Dict[str, Any]:
+    live_runtime = dict(mvsim_mode_summary.get("live_runtime") or {})
     if validation_result is None:
         return {
             "overall_status": "idle",
+            "mvsim_mode": mvsim_mode_summary.get("effective_mode"),
+            "live_runtime_available": bool(live_runtime.get("runtime_available")),
             "route_completed": False,
             "latest_spot_name": None,
             "latest_narration_text": None,
@@ -74,6 +79,8 @@ def summarize_validation_snapshot(
             and bool(question_result.get("ok"))
         )
         else "failed",
+        "mvsim_mode": validation_result.get("mvsim_mode") or mvsim_mode_summary.get("effective_mode"),
+        "live_runtime_available": bool(live_runtime.get("runtime_available")),
         "route_completed": route_completed,
         "latest_spot_name": session_result.get("latest_spot_name") or question_result.get("spot_name"),
         "latest_narration_text": session_result.get("latest_narration_text"),
@@ -113,6 +120,12 @@ class MVSimValidationHarnessRuntime:
         with config_path.open("r", encoding="utf-8") as handle:
             return yaml.safe_load(handle) or {}
 
+    def _config_cli_arg(self) -> str:
+        try:
+            return str(self._config_path.relative_to(self._repo_root))
+        except ValueError:
+            return str(self._config_path)
+
     def _build_service_specs(self) -> Dict[str, Dict[str, Any]]:
         endpoint_by_service = {
             str(item.get("service_id")): item
@@ -129,7 +142,7 @@ class MVSimValidationHarnessRuntime:
                     "python",
                     "scripts/run_sim_pose_ingress_server.py",
                     "--config",
-                    str(self._config_path.relative_to(self._repo_root)),
+                    self._config_cli_arg(),
                     "--host",
                     str(sim_endpoint.get("bind_host", "127.0.0.1")),
                     "--port",
@@ -148,7 +161,7 @@ class MVSimValidationHarnessRuntime:
                     "python",
                     "scripts/run_api_server.py",
                     "--config",
-                    str(self._config_path.relative_to(self._repo_root)),
+                    self._config_cli_arg(),
                     "--host",
                     str(api_endpoint.get("bind_host", "127.0.0.1")),
                     "--port",
@@ -253,6 +266,7 @@ class MVSimValidationHarnessRuntime:
         sim_check = self._probe_service_health("sim_pose_ingress_server")
         api_check = self._probe_service_health("api_server")
         debug_check = self._probe_debug_page()
+        mvsim_mode_summary = describe_mvsim_runtime_mode(self._config, self._repo_root)
         return {
             "status": "ok",
             "service": "mvsim-validation-harness",
@@ -261,6 +275,7 @@ class MVSimValidationHarnessRuntime:
             "debug_url": self.debug_url,
             "supports_attach_existing": True,
             "supports_local_launch": True,
+            "mvsim_mode_summary": mvsim_mode_summary,
             "service_checks": {
                 "sim_pose_ingress": sim_check,
                 "api_server": api_check,
@@ -270,6 +285,7 @@ class MVSimValidationHarnessRuntime:
                 sim_ingress_check=sim_check,
                 api_check=api_check,
                 debug_check=debug_check,
+                mvsim_mode_summary=mvsim_mode_summary,
                 validation_result=self._last_validation_result,
             ),
             "last_validation_result": self._last_validation_result,
@@ -336,6 +352,22 @@ class MVSimValidationHarnessRuntime:
         return {"ok": True, "action": "stop_local_stack", "stopped_services": stopped}
 
     def run_validation(self, question: str = "What does this final stop prove?") -> Dict[str, Any]:
+        mvsim_mode_summary = describe_mvsim_runtime_mode(self._config, self._repo_root)
+        if mvsim_mode_summary.get("configured_mode") == "live_runtime":
+            live_runtime = dict(mvsim_mode_summary.get("live_runtime") or {})
+            self._last_validation_result = {
+                "status": "blocked_live_runtime_unavailable"
+                if live_runtime.get("blocker")
+                else "blocked_live_runtime_not_validated",
+                "mvsim_mode": mvsim_mode_summary.get("effective_mode"),
+                "mvsim_mode_summary": mvsim_mode_summary,
+                "detail": (live_runtime.get("blocker") or {}).get(
+                    "detail",
+                    "live MVSim runtime path is configured but this PC has not validated a live pose bridge yet",
+                ),
+            }
+            return self._last_validation_result
+
         start_result = self.start_local_stack()
         sim_check = start_result["service_checks"]["sim_pose_ingress"]
         api_check = start_result["service_checks"]["api_server"]
@@ -343,6 +375,8 @@ class MVSimValidationHarnessRuntime:
         if not (sim_check.get("reachable") and api_check.get("reachable")):
             self._last_validation_result = {
                 "status": "failed_precondition",
+                "mvsim_mode": mvsim_mode_summary.get("effective_mode"),
+                "mvsim_mode_summary": mvsim_mode_summary,
                 "service_checks": start_result["service_checks"],
                 "detail": "required local services are not reachable",
             }
@@ -352,6 +386,8 @@ class MVSimValidationHarnessRuntime:
         if not observation_file:
             self._last_validation_result = {
                 "status": "failed_precondition",
+                "mvsim_mode": mvsim_mode_summary.get("effective_mode"),
+                "mvsim_mode_summary": mvsim_mode_summary,
                 "service_checks": start_result["service_checks"],
                 "detail": "sim config is missing mvsim_integration.observation_file",
             }
@@ -392,6 +428,8 @@ class MVSimValidationHarnessRuntime:
                 and bool(question_result.get("ok"))
             )
             else "failed",
+            "mvsim_mode": mvsim_mode_summary.get("effective_mode"),
+            "mvsim_mode_summary": mvsim_mode_summary,
             "service_checks": {
                 "sim_pose_ingress": sim_check,
                 "api_server": api_check,

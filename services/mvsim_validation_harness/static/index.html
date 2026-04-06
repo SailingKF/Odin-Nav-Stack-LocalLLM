@@ -40,7 +40,7 @@
   <main class="page">
     <section class="hero">
       <h1>MVSim Validation Harness</h1>
-      <p>PC-only acceptance panel for the current MVSim compatibility path. Start or attach the local sim stack, run one guided validation, then inspect the key pass/fail results and jump into <code>/debug</code>.</p>
+      <p>PC-only acceptance panel for the current MVSim path. It shows whether this machine is using a real live runtime or the compatibility shim, lets you start or attach the local sim stack, and summarizes one guided validation before handing off to <code>/debug</code>.</p>
     </section>
     <div class="grid">
       <section class="card">
@@ -102,6 +102,9 @@
       elements.openDebug.href = payload.debug_url || "#";
       renderPanel(elements.summaryPanel, [
         ["Harness URL", payload.harness_url],
+        ["Configured MVSim Mode", payload.mvsim_mode_summary ? payload.mvsim_mode_summary.configured_mode : null],
+        ["Effective MVSim Mode", snapshot.mvsim_mode || (payload.mvsim_mode_summary ? payload.mvsim_mode_summary.effective_mode : null), snapshot.mvsim_mode==="compatibility_shim" ? "warn" : snapshot.mvsim_mode==="blocked_live_runtime" ? "fail" : "ok"],
+        ["Live Runtime Available", snapshot.live_runtime_available, snapshot.live_runtime_available ? "ok" : "warn"],
         ["Overall Status", snapshot.overall_status || "idle", snapshot.overall_status==="passed" ? "ok" : snapshot.overall_status==="failed" ? "fail" : "warn"],
         ["Route Completed", snapshot.route_completed, snapshot.route_completed ? "ok" : "warn"],
         ["Latest Session", snapshot.latest_session_id],
@@ -111,14 +114,18 @@
       ]);
       renderPanel(elements.servicePanel, Object.values(serviceChecks).map(item => [
         item.display_name, `${item.status} | ${item.detail}`, item.status==="healthy" ? "ok" : item.status==="port_conflict" ? "warn" : "fail"
+      ]).concat([
+        ["Live MVSim Runtime", payload.mvsim_mode_summary && payload.mvsim_mode_summary.live_runtime ? `${payload.mvsim_mode_summary.live_runtime.runtime_available ? "available" : "missing"} | ${payload.mvsim_mode_summary.live_runtime.blocker ? payload.mvsim_mode_summary.live_runtime.blocker.detail : (payload.mvsim_mode_summary.live_runtime.world_file_exists ? "world file ready" : "world file missing")}` : "N/A", payload.mvsim_mode_summary && payload.mvsim_mode_summary.live_runtime && payload.mvsim_mode_summary.live_runtime.runtime_available ? "ok" : "warn"],
+        ["Compatibility Source", payload.mvsim_mode_summary && payload.mvsim_mode_summary.compatibility_source ? `${payload.mvsim_mode_summary.compatibility_source.source_kind} | ${payload.mvsim_mode_summary.compatibility_source.observation_file_exists ? "observation file ready" : "observation file missing"}` : "N/A", payload.mvsim_mode_summary && payload.mvsim_mode_summary.compatibility_source ? "ok" : "warn"]
       ]));
       renderPanel(elements.validationPanel, [
         ["Validation Status", validation.status || "not_run", validation.status==="passed" ? "ok" : validation.status && validation.status!=="not_run" ? "fail" : "warn"],
-        ["MVSim Source", validation.mvsim_source ? validation.mvsim_source.source_kind : null],
+        ["MVSim Source", validation.mvsim_source ? validation.mvsim_source.source_kind : (validation.mvsim_mode_summary ? validation.mvsim_mode_summary.effective_mode : null)],
         ["Route Completed", validation.sim_ingress_state ? validation.sim_ingress_state.route_completed : null, validation.sim_ingress_state && validation.sim_ingress_state.route_completed ? "ok" : "warn"],
         ["Latest Narration", validation.api_latest_session ? validation.api_latest_session.latest_narration_text : null],
         ["Session ID", validation.api_latest_session ? validation.api_latest_session.session_id : null],
         ["Question Result", validation.question_result ? validation.question_result.answer_text : null],
+        ["Blocker", validation.detail || null],
       ]);
     }
     async function refreshStatus() { try { const payload = await callApi("/status"); renderStatus(payload); setFeedback("Status refreshed."); } catch (error) { setFeedback(`Status refresh failed: ${error.message}`, true); } }

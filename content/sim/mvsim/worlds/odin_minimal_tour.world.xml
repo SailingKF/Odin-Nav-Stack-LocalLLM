@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<mvsim_world version="1.0">
+  <simul_timestep>0</simul_timestep>
+
+  <gui>
+    <show_forces>false</show_forces>
+    <show_sensor_points>false</show_sensor_points>
+  </gui>
+
+  <element class="horizontal_plane">
+    <elevation>0</elevation>
+    <color>0.92 0.92 0.92</color>
+    <x_min>-8</x_min>
+    <x_max>10</x_max>
+    <y_min>-6</y_min>
+    <y_max>6</y_max>
+    <texture_size>8</texture_size>
+  </element>
+
+  <element class="ground_grid">
+    <floating>true</floating>
+    <color>0.65 0.65 0.65</color>
+  </element>
+
+  <include file="../definitions/odin_tour_bot.vehicle.xml" />
+
+  <vehicle name="tour_bot" class="odin_tour_bot">
+    <init_pose>-3.0 -1.5 0.0</init_pose>
+    <publish>
+      <publish_pose_topic>/tour_bot/pose</publish_pose_topic>
+      <publish_pose_period>0.10</publish_pose_period>
+    </publish>
+  </vehicle>
+
+  <walls>
+    <wall> -4.0 -3.0  7.0 -3.0</wall>
+    <wall>  7.0 -3.0  7.0  3.0</wall>
+    <wall>  7.0  3.0 -4.0  3.0</wall>
+    <wall> -4.0  3.0 -4.0 -3.0</wall>
+    <wall> -0.5 -3.0 -0.5  0.8</wall>
+    <wall>  2.4 -0.3  5.2 -0.3</wall>
+  </walls>
+</mvsim_world>

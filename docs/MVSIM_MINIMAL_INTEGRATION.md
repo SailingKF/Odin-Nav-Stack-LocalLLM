@@ -57,6 +57,26 @@ This means:
 - the HTTP validation path is real
 - but this round does **not** claim a direct live MVSim process integration
 
+## Live Runtime Status After Round 031
+
+Round 031 adds a separate live-runtime bring-up contract:
+
+- `services/sim_publisher_bridge/mvsim_live.py`
+- `scripts/print_mvsim_live_probe.py`
+- `content/sim/mvsim/definitions/odin_tour_bot.vehicle.xml`
+- `content/sim/mvsim/worlds/odin_minimal_tour.world.xml`
+
+That live path is intentionally distinct from the compatibility shim.
+
+Current state on this PC:
+
+- compatibility shim path: validated
+- live runtime path: blocked because no real `mvsim` executable was found
+
+See:
+
+- `docs/MVSIM_LIVE_RUNTIME_BRINGUP.md`
+
 ## Implementation Location
 
 MVSim-oriented source/seam:

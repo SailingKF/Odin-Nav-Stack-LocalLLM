@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<vehicle:class name="odin_tour_bot">
+  <dynamics class="differential">
+    <chassis mass="14.0" zmin="0.00" zmax="0.34">
+      <shape>
+        <pt> 0.36  0.24</pt>
+        <pt>-0.30  0.24</pt>
+        <pt>-0.36  0.00</pt>
+        <pt>-0.30 -0.24</pt>
+        <pt> 0.36 -0.24</pt>
+      </shape>
+    </chassis>
+    <l_wheel pos="0.00 0.21" mass="1.0" width="0.08" diameter="0.18" />
+    <r_wheel pos="0.00 -0.21" mass="1.0" width="0.08" diameter="0.18" />
+    <controller class="twist_pid">
+      <KP>10.0</KP>
+      <KI>1.5</KI>
+      <KD>0.0</KD>
+      <max_torque>20.0</max_torque>
+      <V>0.0</V>
+      <W>0.0</W>
+    </controller>
+  </dynamics>
+  <friction class="default">
+    <mu>0.9</mu>
+    <C_damping>0.5</C_damping>
+  </friction>
+</vehicle:class>

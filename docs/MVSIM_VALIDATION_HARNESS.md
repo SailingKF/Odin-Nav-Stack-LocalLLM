@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the narrow operator-facing validation harness added on top of the current MVSim compatibility path.
+This document defines the narrow operator-facing validation harness added on top of the current MVSim path.
 
 The goal is to let a human validate the current PC-side simulation path from one local page instead of manually coordinating:
 
@@ -65,6 +65,9 @@ The harness does **not** try to become a general multi-service supervisor.
 
 The harness currently surfaces at least:
 
+- configured MVSim mode
+- effective MVSim mode
+- live-runtime availability
 - sim-ingress reachability
 - sim-profile API reachability
 - `/debug` availability
@@ -81,6 +84,7 @@ Current common operator failures are surfaced as:
 - `healthy`
 - `unreachable`
 - `port_conflict`
+- `blocked_live_runtime`
 
 Current examples:
 
@@ -90,14 +94,15 @@ Current examples:
   - reported as `unreachable`
 - validation cannot start because local services are still missing
   - reported as `failed_precondition`
+- validation is switched to `live_runtime` but no real `mvsim` runtime is available
+  - reported as `blocked_live_runtime_unavailable`
 
 ## Scope Limits
 
 This harness does not:
 
-- provide live MVSim runtime integration
 - redesign simulation architecture
 - manage long-running packaged services
 - replace `/debug`
 
-It only makes the current PC-side MVSim validation flow much easier for a human to inspect.
+It makes the current PC-side MVSim validation flow much easier for a human to inspect and it now also makes the live-runtime blocker explicit when `mvsim` is not available.
