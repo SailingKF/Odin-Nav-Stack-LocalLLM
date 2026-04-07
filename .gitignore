@@ -6,3 +6,6 @@ session_logs/
 __pycache__/
 *.pyc
 .vendor_wheels/
+tmp_mvsim_harness_smoke/
+tmp_mvsim_live_bridge_smoke/
+tmp_mvsim_runtime_attempt/

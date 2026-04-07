@@ -207,6 +207,25 @@ Bad prompt traits:
 
 ---
 
+## Cross-Thread Coordination Protocol
+
+When work is coordinated across separate chat threads, use repository files as the handoff contract.
+
+Recommended files:
+- `coordination/latest_prompt.md`
+- `coordination/latest_result.md`
+- `coordination/archive/`
+
+Recommended rule:
+1. owner thread writes the latest prompt
+2. execution thread reads it before work
+3. execution thread writes the latest result after work
+4. owner thread reviews repo state plus the latest result and decides the next round
+
+This avoids hidden chat-thread context becoming part of the engineering process.
+
+---
+
 ## Definition of Done for a Bundle
 
 A bundle is done when:
