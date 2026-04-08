@@ -86,6 +86,38 @@ This reports:
 - the launch command that would be used
 - the current blocker, if any
 
+## Current Windows Bootstrap Sequence
+
+For the current Windows workstation bootstrap path, use this exact order:
+
+1. Install the repo-owned Python dependencies:
+
+```text
+python -m pip install -r requirements-dev.txt
+```
+
+2. If WSL is not installed, run the elevated Windows enablement step:
+
+```text
+wsl.exe --install -d Ubuntu
+```
+
+3. After Ubuntu first-launch completes, install the Linux-side MVSim runtime with the Round 033 command sequence already documented below.
+
+4. Re-run the live probe:
+
+```text
+python scripts/print_mvsim_live_probe.py --config configs/sim_harness.yaml
+```
+
+Current machine truth on this PC after Round 046 is now:
+
+- `wsl.exe --status` succeeds and reports default distribution `Ubuntu` with default version `2`
+- `wsl.exe --list --verbose` shows `Ubuntu` on WSL version `2`
+- `scripts/print_mvsim_live_probe.py --config configs/sim_harness.yaml` reports `effective_mode = "live_runtime"`
+- the configured distro `Ubuntu` can execute `/root/round033-mvsim-build/bin/mvsim`
+- WSL still emits a localhost-proxy NAT warning on startup, but it did not block runtime verification
+
 ## How The Validation Harness Surfaces It
 
 The MVSim validation harness now shows:

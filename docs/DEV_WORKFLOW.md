@@ -185,6 +185,50 @@ This sequence should be repeated consistently.
 
 ---
 
+## Current Windows Bootstrap
+
+For the current repo-owned Windows dev/test path, install the explicit dependency manifest first:
+
+```shell
+python -m pip install -r requirements-dev.txt
+```
+
+Then run the narrow validation ladder that is currently most useful on this machine:
+
+```shell
+python -m unittest tests.test_mvsim_validation_reporting -v
+python -m unittest tests.test_mvsim_validation_map_view -v
+python -m unittest tests.test_mvsim_validation_harness -v
+python scripts/print_mvsim_live_probe.py --config configs/sim_harness.yaml
+```
+
+Current machine truth matters here:
+
+- if `tests.test_mvsim_validation_harness` fails because `httpx` is missing, the manifest is incomplete and should be updated
+- if `scripts/print_mvsim_live_probe.py` reports `blocked_live_runtime`, the WSL/MVSim path still needs bring-up
+- if `scripts/print_mvsim_live_probe.py` reports `live_runtime`, the configured `Ubuntu` distro and `/root/round033-mvsim-build/bin/mvsim` path are reachable from the current repo configuration
+- do not treat that blocker as a product bug
+
+---
+
+## WSL / MVSim Bring-Up
+
+When Windows WSL is not installed, the repo-local live-runtime path cannot be claimed as ready.
+
+If WSL is already installed, skip the elevated Windows step and continue with the Ubuntu-side runtime sequence until `python scripts/print_mvsim_live_probe.py --config configs/sim_harness.yaml` reports `effective_mode = "live_runtime"`.
+
+The elevated Windows step is:
+
+```shell
+wsl.exe --install -d Ubuntu
+```
+
+After the Ubuntu shell first-launch completes, follow the Linux-side runtime sequence described in [`docs/MVSIM_LIVE_RUNTIME_BRINGUP.md`](MVSIM_LIVE_RUNTIME_BRINGUP.md).
+
+That Linux-side path is part of the repo-owned bootstrap story and should stay visible from this workflow doc.
+
+---
+
 ## Codex / Agent Prompting Guidance
 
 Prompts should be:
