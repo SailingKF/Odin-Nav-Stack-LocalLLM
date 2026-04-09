@@ -114,9 +114,53 @@ The demo script:
   - whether a live first POI hit occurred
   - whether a live second POI hit occurred
   - whether a live second narration event occurred
-  - whether route completion occurred
-  - which recent triggered/narrated spots were actually observed
-  - the configured alignment and motion strategy
+- whether route completion occurred
+- which recent triggered/narrated spots were actually observed
+- the configured alignment and motion strategy
+
+## GUI Manual Review Flow
+
+For a visible MVSim operator review on this Windows + WSLg machine, keep the validated headless path unchanged and use a separate GUI launcher terminal:
+
+Terminal 1:
+
+```text
+python scripts/run_mvsim_gui_review.py --config configs/sim_harness.yaml
+```
+
+This launcher:
+
+- starts the repo-owned live-validation world with GUI instead of `--headless`
+- cleans up an older MVSim WSL runtime first unless `--reuse-existing-runtime` is used
+- prints the exact follow-up commands for the current config
+- keeps the GUI runtime alive until the operator stops that terminal
+
+Then attach the existing GUI runtime from separate Windows terminals:
+
+Terminal 2:
+
+```text
+python scripts/run_sim_pose_ingress_server.py --config configs/sim_harness.yaml --host 127.0.0.1 --port 8110
+```
+
+Terminal 3:
+
+```text
+python scripts/run_mvsim_live_bridge_demo.py --config configs/sim_harness.yaml --base-url http://127.0.0.1:8110 --sample-count 180 --attach-existing-runtime
+```
+
+Optional API visibility in another terminal:
+
+```text
+python scripts/run_api_server.py --config configs/sim_harness.yaml --host 127.0.0.1 --port 8001
+```
+
+Notes:
+
+- the GUI review path uses the same `odin_live_multistop_tour.world.xml` validation asset
+- the attach path stays repo-owned by reusing `run_mvsim_live_bridge_demo.py --attach-existing-runtime`
+- the current harness/runtime validation path still remains headless-oriented; this GUI path is for operator review, not a replacement for the existing automated live-validation seam
+- the WSL repo mount path contains spaces, so the GUI launcher intentionally `cd`s into the repo first and launches the world by repo-relative path
 
 ## What Was Truthfully Validated
 
