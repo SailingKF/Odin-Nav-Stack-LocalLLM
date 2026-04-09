@@ -1,77 +1,95 @@
 # Current Round Prompt
 
 ## Round
-Round 048 - Compatibility Shim Validation And Comparison Export Closure
+Round 050 - MVSim GUI Manual Review Bring-Up
 
 ## Goal
-Now that the live MVSim end-to-end path is verified on this PC, the next narrow goal is to run one fresh `compatibility_shim` harness validation so the latest comparison export can move from `missing_reports` to a real live-vs-compatibility comparison.
+Now that the repo has a validated headless `live_runtime` path and the Windows-side WSL decode cleanup is complete, the next narrow goal is to make one truthful GUI-based MVSim operator review path available on this PC.
 
-This round is a comparison-closure round.
-It is not a feature-expansion round.
+This round is a manual-review bring-up round.
+It is not a new product-feature round.
 
 ## Why This Is The Current Priority
 
-Round 047 verified the live path end-to-end:
+The current repo truth is good enough for automated and semi-automated validation:
 
-- the isolated harness stack completed a truthful `live_runtime` validation run
-- live pose reached the stack
-- first stop, second stop, and route completion were all observed
-- a fresh live-runtime report was written
+- `live_runtime` has already passed end-to-end
+- `compatibility_shim` comparison closure is already complete
+- the recent Windows-side `UnicodeDecodeError` cleanup passed and is already merged on `main`
 
-But the latest comparison export still says:
+But there is still one practical gap for product review:
 
-- `comparison_status = "missing_reports"`
-- `missing_modes = ["compatibility_shim"]`
+- almost all validated live-runtime flows still launch MVSim in `--headless` mode
+- the repo does not yet provide a clean operator-owned path for "start the GUI simulator, watch the run, and attach the current bridge/harness to that same runtime"
+- that means the project is technically validated, but still awkward for human demo/review
 
-So the main remaining risk is no longer live-runtime bring-up.
-The main remaining risk is that the repo still lacks one fresh compatibility-side report using the same validation assets, which means the latest comparison/export guardrail path is not yet closed on this PC.
+The next highest-value step is therefore not another correctness fix.
+It is making one narrow GUI review path truthful and repeatable.
+
+## Execution Discipline
+
+- Follow the repo-root `AGENTS.md` workflow.
+- Read `coordination/bootstrap_prompt.md` and this file before doing any work.
+- Use the same bounded subagent pattern as the previous round:
+  - `builder-subagent`
+  - `reviewer-subagent`
+- Keep subagent output advisory only; the main executor remains responsible for the final patch, validation, result file, commit, and push.
 
 ## In Scope
 
-- run one fresh harness validation in `compatibility_shim` mode using the current isolated harness stack
-- use the same repo-owned harness/report surfaces already used in Round 047
-- collect the new compatibility report
-- trigger the comparison/export path again
-- verify whether the latest comparison now becomes available and what it truthfully says
-- verify whether the live and compatibility reports are directly comparable under the current guardrails
-- update docs only if the current operator instructions or comparison truth become stale
-- make only the smallest code changes needed if a narrow comparison/report seam bug is found
+- identify the narrowest truthful way to launch the current repo-owned MVSim live-validation world with a visible GUI on this PC
+- preserve the already-validated headless path; do not replace it
+- prefer the same validated live asset seam where possible:
+  - `content/sim/mvsim/worlds/odin_live_multistop_tour.world.xml`
+  - the existing `live_runtime` WSL bring-up path
+- determine whether the best repo-owned GUI review path should be:
+  - a small launcher/script addition
+  - a narrow extension of an existing script
+  - or a documentation-first operator command path if no code is needed
+- if GUI launch succeeds, prove at least one existing Windows-side consumer can attach to the already-running GUI runtime, preferably through one of:
+  - the current live bridge demo with `--attach-existing-runtime`
+  - the current validation harness / live validation path
+- record the exact operator steps for a future human review session
+- update docs only where the operator-facing review path becomes materially clearer
 
 ## Desired Outcome
 
 At the end of this round, the repo should be in one of these honest states:
 
-1. A fresh `compatibility_shim` report exists and the latest comparison export truthfully compares live vs compatibility on this PC.
-2. The compatibility validation passes, but the comparison/export seam still has a narrow blocker that is recorded explicitly.
-3. The compatibility validation itself is blocked, and the exact blocker is recorded explicitly.
+1. A repo-owned GUI MVSim review path works on this PC, and the current stack can attach to it for at least one representative live review flow.
+2. A GUI MVSim window can be launched, but the current bridge/harness attach path has a narrow blocker that is explicitly recorded.
+3. GUI bring-up is blocked by a concrete environment/runtime issue on this PC, and that blocker is explicitly recorded with exact attempted commands.
 
-Do not claim comparison closure unless a fresh compatibility report was actually written and the comparison surfaces were re-read.
+Do not claim GUI review readiness unless a real GUI launch attempt was made on this machine.
 
 ## Out Of Scope
 
-- new live-runtime work
-- new UI features
-- map/report redesign
-- broader harness refactors
-- Isaac Sim expansion
-- Orin NX deployment work
-- unrelated product functionality
+- new POI/content features
+- new Android UI work
+- broader harness redesign
+- new comparison/export features
+- simulator world redesign unless a tiny launch-related asset correction is absolutely required
+- Isaac Sim work
+- Orin NX work
+- general-purpose simulator control frameworks
 
 ## Architecture Constraints
 
-- preserve the current harness/report/comparison seams
-- do not push simulator-specific behavior into `core`
-- prefer validating the existing isolated harness path over inventing a new flow
-- if a bug is found, fix only the narrow compatibility/report/comparison seam required for truthful comparison output
-- keep artifacts and result files honest about what was actually observed on this PC
+- keep `core` platform-independent
+- keep simulator/runtime specifics in adapters/scripts/services seams
+- do not introduce a new simulator orchestration layer just for this round
+- prefer a tiny operator-facing launcher or doc path over broad service changes
+- preserve the current validated headless `live_runtime` path
+- do not let the business/runtime core depend directly on a GUI-only path
 
 ## Acceptance Criteria
 
-- the round runs a fresh `compatibility_shim` harness validation or records the exact blocker
-- a fresh compatibility report is written, or the exact reason it was not is recorded
-- the latest comparison/export surfaces are re-read after that compatibility attempt
-- the round determines whether live and compatibility reports are directly comparable under current guardrails
-- the round records the truthful comparison result or the exact narrow blocker
+- the round attempts one real GUI MVSim launch path on this PC
+- the round identifies the narrowest truthful operator path for GUI review
+- if GUI launch works, the round proves at least one current Windows-side consumer can attach to that already-running runtime
+- the round records whether a visible GUI review path is now available for a human operator
+- the round preserves the already-validated headless live-runtime path
+- `coordination/latest_result.md` is updated with exact commands, observed results, and the true blocker state if any
 
 ## Result Requirements
 
@@ -79,32 +97,28 @@ When done, update `coordination/latest_result.md` with:
 
 - what you changed
 - exact files changed
-- the exact commands used
-- the exact observed result of:
-  - `python scripts/print_mvsim_live_probe.py --config configs/sim_harness.yaml`
-  - harness run / API calls / status checks used for `compatibility_shim`
-  - `GET /reports/latest`
-  - `GET /reports/recent`
-  - `GET /reports/compare`
-  - `POST /reports/compare/export`
-- whether a fresh `compatibility_shim` report was written and its path
-- whether the latest comparison export still says `missing_reports`, or now reports a real comparison
-- whether the reports were:
-  - `comparable`
-  - `comparable_with_warnings`
-  - `not_directly_comparable`
-- the key guardrail reasons, if any
+- whether the round used:
+  - a new script
+  - an updated script
+  - docs only
+- the exact GUI launch command attempted
+- the exact observed result of the GUI launch attempt
+- whether a visible MVSim GUI window was actually available to the operator
+- the exact attach/consumer command attempted after GUI bring-up
+- the exact observed result of that attach path
+- whether the headless validation path was rechecked and what happened
 - whether this round ended in:
-  - `compatibility_comparison_closed`
-  - `compatibility_report_written_but_comparison_blocked`
-  - `compatibility_validation_blocked`
-- what the next narrow step is after this
+  - `mvsim_gui_review_path_ready`
+  - `mvsim_gui_launch_ready_but_attach_blocked`
+  - `mvsim_gui_review_blocked`
+- the recommended human-review steps after this round
 - exact validation performed
 - branch name
 - full `git status --short --branch`
 - commit hash
 - whether files are staged and/or committed
+- whether push succeeded
 - blockers, risks, or remaining gaps
 
-If blocked, do not broaden into new product work.
-Stop at the narrowest compatibility/comparison blocker and record it clearly.
+If blocked, do not expand into general simulator engineering.
+Stop at the narrowest GUI-review blocker and record it clearly.
