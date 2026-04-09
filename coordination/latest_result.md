@@ -1,93 +1,140 @@
 # Current Round Result
 
 ## Round
-Round 049 - Windows WSL Subprocess Decode Cleanup
+Round 050 - MVSim GUI Manual Review Bring-Up
 
 ## Goal
-Remove the remaining Windows-side `UnicodeDecodeError` risk while reading WSL subprocess output, without changing the validated live-runtime behavior.
+Make one truthful GUI-based MVSim operator review path available on this PC without disturbing the already-validated headless `live_runtime` path.
 
 ## Summary
 
-- Status: `windows_wsl_decode_cleanup_completed`
-- The concrete decode seam was the Windows host reading WSL subprocess output with `text=True` and the platform default codec.
-- The fix was kept local to the live-runtime harness seam by explicitly decoding those subprocess streams as UTF-8 with replacement for undecodable bytes.
-- `python scripts/print_mvsim_live_probe.py --config configs/sim_harness.yaml` still reports `effective_mode = "live_runtime"`.
-- A representative live-runtime validation still passed after the change.
-- No `UnicodeDecodeError` was observed in the validation command output or in the newest relevant harness log/report files checked for this round.
+- Status: `mvsim_gui_review_path_ready`
+- This round added one repo-owned GUI launcher:
+  - `scripts/run_mvsim_gui_review.py`
+- The launcher starts the current live-validation world in WSL without `--headless` and prints the exact follow-up attach commands for the current config.
+- A real GUI launch attempt was made on this PC.
+- The existing Windows-side consumer path was then attached to that already-running runtime via:
+  - `python scripts/run_mvsim_live_bridge_demo.py --attach-existing-runtime`
+- The attach path succeeded and relayed live pose into the current Windows-side stack.
+- The already-validated headless probe path still reports `effective_mode = "live_runtime"`.
 
-## Exact Subprocess / Decode Seam Fixed
+## What Changed
 
-- `services/mvsim_validation_harness/runtime.py`
-  - `_cleanup_existing_live_runtime()`
-  - `_run_live_bridge_validation()`
-- `services/sim_publisher_bridge/mvsim_live_source.py`
-  - `WslMVSimTopicEchoSource.iter_payloads()`
+- Added a dedicated GUI manual-review launcher:
+  - `scripts/run_mvsim_gui_review.py`
+- Updated operator documentation:
+  - `docs/MVSIM_LIVE_POSE_BRIDGE.md`
+- Updated this handoff file:
+  - `coordination/latest_result.md`
 
-Before this round, those WSL subprocess calls relied on Windows default text decoding.
-This was the same seam previously associated with `UnicodeDecodeError: 'gbk' codec can't decode byte ...` in the Round 047 harness stderr capture.
+## Exact Files Changed
 
-## Actual Files Changed
-
-- `AGENTS.md`
+- `scripts/run_mvsim_gui_review.py`
+- `docs/MVSIM_LIVE_POSE_BRIDGE.md`
 - `coordination/latest_result.md`
-- `services/mvsim_validation_harness/runtime.py`
-- `services/sim_publisher_bridge/mvsim_live_source.py`
 
-## Modification Summary
+## Round Shape
 
-- Added repo-root coordination guidance to `AGENTS.md` so executor rounds must read `coordination/bootstrap_prompt.md` and `coordination/latest_prompt.md`, respect the round state machine, and keep subagent usage bounded.
-- Updated the WSL subprocess call sites in `services/mvsim_validation_harness/runtime.py` to use:
-  - `encoding="utf-8"`
-  - `errors="replace"`
-- Updated the WSL topic-echo subprocess in `services/sim_publisher_bridge/mvsim_live_source.py` to use:
-  - `encoding="utf-8"`
-  - `errors="replace"`
-- Recorded the truthful Round 049 outcome in `coordination/latest_result.md`.
+- New script: yes
+- Updated script: no
+- Docs updated: yes
 
-## Exact Commands Used
+## Why The New Launcher Was Needed
+
+Direct non-headless launch attempts using the full WSL path with spaces were not robust enough for a clean operator flow.
+
+What was observed before the fix:
+
+- using a shell-string launch with the full world path:
+  - `/mnt/d/Vibe Coding Projects/Odin-Nav-Stack-LocalLLM/...`
+  - produced:
+    - `Error: cannot open file /mnt/d/Vibe`
+- after switching to:
+  - `cd '/mnt/d/Vibe Coding Projects/Odin-Nav-Stack-LocalLLM'`
+  - then launching the world by repo-relative path:
+    - `content/sim/mvsim/worlds/odin_live_multistop_tour.world.xml`
+  - MVSim reached the normal simulator startup path
+- one intermediate attempt also failed with:
+  - `ZMQ error: Address already in use`
+  - until the WSL runtime state was reset with `wsl.exe --shutdown`
+
+So the narrow repo-owned fix was to encapsulate the GUI launch as:
+
+- change into the repo's WSL mount path first
+- launch the same validated world by repo-relative path
+- keep the launcher terminal alive for manual review
+
+## Exact GUI Launch Command Attempted
+
+The repo-owned operator command attempted for this round was:
 
 ```text
-python -m unittest tests.test_mvsim_validation_harness -v
-python scripts/print_mvsim_live_probe.py --config configs/sim_harness.yaml
-python - <<'PY'
-from pathlib import Path
-import json
-from services.mvsim_validation_harness.runtime import MVSimValidationHarnessRuntime
-
-repo = Path.cwd()
-runtime = MVSimValidationHarnessRuntime(
-    config_path=repo / "configs" / "sim_harness.yaml",
-    repo_root=repo,
-    harness_url="http://127.0.0.1:8300",
-)
-try:
-    result = runtime.run_validation(validation_mode="live_runtime")
-    print(json.dumps({
-        "status": result.get("status"),
-        "validation_mode": result.get("validation_mode"),
-        "mvsim_mode": result.get("mvsim_mode"),
-        "route_completed": bool((result.get("bridge_result") or {}).get("final_state", {}).get("route_completed")),
-        "live_first_poi_hit_occurred": bool((result.get("live_validation_summary") or {}).get("live_first_poi_hit_occurred")),
-        "live_second_poi_hit_occurred": bool((result.get("live_validation_summary") or {}).get("live_second_poi_hit_occurred")),
-        "report_path": result.get("report_path"),
-    }, ensure_ascii=False, indent=2))
-finally:
-    print(json.dumps({"stop_result": runtime.stop_local_stack()}, ensure_ascii=False, indent=2))
-PY
-Get-ChildItem session_logs/mvsim_validation_harness -Recurse -File | Sort-Object LastWriteTime -Descending | Select-Object -First 12 FullName,LastWriteTime
-Get-ChildItem session_logs/mvsim_validation_harness -Recurse -File | Sort-Object LastWriteTime -Descending | Select-Object -First 12 -ExpandProperty FullName | ForEach-Object { "`n=== $_ ==="; Select-String -Path $_ -Pattern 'UnicodeDecodeError|gbk codec|Traceback' -SimpleMatch }
+python scripts/run_mvsim_gui_review.py --config configs/sim_harness.yaml
 ```
 
-## Exact Observed Results
+During validation, the launcher started this WSL runtime command:
 
-### `python -m unittest tests.test_mvsim_validation_harness -v`
+```text
+wsl.exe -d Ubuntu -u root -- bash -lc "cd '/mnt/d/Vibe Coding Projects/Odin-Nav-Stack-LocalLLM' && exec /root/round033-mvsim-build/bin/mvsim launch content/sim/mvsim/worlds/odin_live_multistop_tour.world.xml -v INFO"
+```
 
-- Result: `OK`
-- Tests run: `8`
-- Failures: `0`
-- Errors: `0`
+## Exact Observed Result Of The GUI Launch Attempt
 
-### `python scripts/print_mvsim_live_probe.py --config configs/sim_harness.yaml`
+- `python scripts/run_mvsim_gui_review.py --help` succeeded and exposed the new operator entrypoint.
+- A real launcher process was started:
+  - `python.exe scripts/run_mvsim_gui_review.py --config configs/sim_harness.yaml`
+- The launcher then spawned non-headless WSL MVSim runtime processes, confirmed by Windows process inspection:
+  - `wsl.exe -d Ubuntu -u root -- bash -lc "cd '/mnt/d/Vibe Coding Projects/Odin-Nav-Stack-LocalLLM' && exec /root/round033-mvsim-build/bin/mvsim launch content/sim/mvsim/worlds/odin_live_multistop_tour.world.xml -v INFO"`
+- Prior foreground launch probes for that same command path printed:
+  - `MVSIM simulator running. Press CTRL+C to end.`
+  - and reached the simulator server startup path
+
+## Visible GUI Window Availability
+
+- A non-headless WSLg-backed MVSim launch was successfully attempted on this PC.
+- This terminal-only executor session cannot directly inspect the Windows desktop surface, so the GUI window itself was not visually witnessed by the executor.
+- The truthful statement is:
+  - the repo now has a working non-headless launcher path intended for a visible operator review window
+  - window visibility is strongly implied by the successful non-headless WSLg runtime launch, but not directly visually confirmed by this terminal session alone
+
+## Exact Attach / Consumer Command Attempted
+
+The existing Windows-side consumer path used after GUI bring-up was:
+
+```text
+python scripts/run_sim_pose_ingress_server.py --config configs/sim_harness.yaml --host 127.0.0.1 --port 8110
+python scripts/run_mvsim_live_bridge_demo.py --config configs/sim_harness.yaml --base-url http://127.0.0.1:8110 --sample-count 3 --attach-existing-runtime
+```
+
+## Exact Observed Result Of The Attach Path
+
+- `sim_pose_ingress_server` started successfully on `http://127.0.0.1:8110`
+- the attach-existing-runtime bridge command exited successfully
+- the bridge command read live pose from the already-running GUI runtime:
+  - richer payload sample:
+    - `x = 9.075166702270508`
+    - `y = 0.5`
+    - `label = "tour_bot"`
+- `live_validation_summary.live_pose_reached_stack = true`
+- `latest_session.session_id = "mock_tour_20260409T082619Z"`
+- because this validation intentionally used only `--sample-count 3`, it did **not** attempt full route completion:
+  - `route_completed = false`
+  - `live_first_poi_hit_occurred = false`
+  - `live_second_poi_hit_occurred = false`
+
+This is still enough to prove the required Round 050 claim:
+
+- an existing Windows-side consumer can attach to the already-running GUI runtime and consume real live pose
+
+## Headless Path Recheck
+
+Rechecked:
+
+```text
+python scripts/print_mvsim_live_probe.py --config configs/sim_harness.yaml
+```
+
+Observed result:
 
 - `configured_mode = "live_runtime"`
 - `effective_mode = "live_runtime"`
@@ -97,98 +144,84 @@ Get-ChildItem session_logs/mvsim_validation_harness -Recurse -File | Sort-Object
 - `live_runtime.wsl_executable_path = "/root/round033-mvsim-build/bin/mvsim"`
 - `live_runtime.blocker = null`
 
-### Representative Live-Runtime Validation
+## Recommended Human-Review Steps
 
-- Command path used:
-  - inline Python invoking `MVSimValidationHarnessRuntime(...).run_validation(validation_mode="live_runtime")`
-- Observed result:
-  - `status = "passed"`
-  - `validation_mode = "live_runtime"`
-  - `mvsim_mode = "live_runtime"`
-  - `route_completed = true`
-  - `live_first_poi_hit_occurred = true`
-  - `live_second_poi_hit_occurred = true`
-- The same inline command also stopped the managed local services successfully:
-  - `stop_result.ok = true`
-  - `stop_result.stopped_services = ["sim_pose_ingress_server", "api_server"]`
-
-### Newest Relevant Report / Log Files Checked
-
-- Latest live report:
-  - `D:\Vibe Coding Projects\Odin-Nav-Stack-LocalLLM\session_logs\mvsim_validation_harness\reports\20260409T060307Z-live_runtime.json`
-- Latest service stderr logs:
-  - `D:\Vibe Coding Projects\Odin-Nav-Stack-LocalLLM\session_logs\mvsim_validation_harness\api_server.stderr.log`
-  - `D:\Vibe Coding Projects\Odin-Nav-Stack-LocalLLM\session_logs\mvsim_validation_harness\sim_pose_ingress_server.stderr.log`
-
-### Decode Failure Check
-
-- Searched the newest relevant harness/report/log files for:
-  - `UnicodeDecodeError`
-  - `gbk codec`
-  - `Traceback`
-- Result:
-  - no `UnicodeDecodeError` was found in those newest files
-  - the live validation command itself also completed without printing a decode traceback
-
-## Reviewer-Subagent Conclusion
-
-- Initial reviewer result: `REWORK`
-- Reason:
-  - Round 049 result handoff had not yet been written to `coordination/latest_result.md`
-  - reviewer also flagged commit-scope caution around `coordination/latest_prompt.md`, which is being treated as pre-existing owner-side round-definition state rather than an executor-round implementation artifact
-- Final reviewer result:
-  - `PASS`
-  - requirements satisfied after the result handoff was completed
-  - no remaining out-of-scope issue in the final executor deliverable
-
-## Pass / Outcome
-
-- Passed: yes
-- Round outcome:
-  - `windows_wsl_decode_cleanup_completed`
-
-## Acceptance Criteria Check
-
-- the round identifies the concrete Windows-side WSL subprocess decode seam: yes
-- the round applies the smallest safe fix in that seam: yes
-- the relevant validation path no longer emits the observed `UnicodeDecodeError`, or the exact remaining case is recorded: yes
-- `python scripts/print_mvsim_live_probe.py --config configs/sim_harness.yaml` still works after the change: yes
-- at least one representative harness or live-runtime validation check still works after the change: yes
-
-## Remaining Issues / Risks
-
-- `errors="replace"` is intentionally tolerant and can hide individual malformed bytes in future WSL output; this is acceptable for robustness, but it is still a visibility tradeoff.
-- `coordination/latest_prompt.md` was already carrying the Round 049 owner prompt in the working tree and is being left as owner-side coordination state rather than treated as the executor’s implementation change.
-
-## Human Input Needed
-
-- No
-
-## Next Narrow Step
-
-- If the owner wants a follow-up cleanup round, the next narrow step should be to centralize the WSL subprocess decoding policy in one local helper so future WSL call sites cannot drift back to Windows default decoding.
+1. In Terminal 1:
+   - `python scripts/run_mvsim_gui_review.py --config configs/sim_harness.yaml`
+2. In Terminal 2:
+   - `python scripts/run_sim_pose_ingress_server.py --config configs/sim_harness.yaml --host 127.0.0.1 --port 8110`
+3. In Terminal 3:
+   - `python scripts/run_mvsim_live_bridge_demo.py --config configs/sim_harness.yaml --base-url http://127.0.0.1:8110 --sample-count 180 --attach-existing-runtime`
+4. Optional `/debug` surface in Terminal 4:
+   - `python scripts/run_api_server.py --config configs/sim_harness.yaml --host 127.0.0.1 --port 8001`
 
 ## Validation Performed
 
-- Unit-tested the harness module.
-- Re-ran the live-runtime probe.
-- Re-ran a real live-runtime validation path through `MVSimValidationHarnessRuntime`.
-- Re-checked the newest harness/report/log artifacts for decode-related errors.
+- `python scripts/run_mvsim_gui_review.py --help`
+- `python scripts/print_mvsim_live_probe.py --config configs/sim_harness.yaml`
+- foreground WSLg/non-headless launch probes to narrow the real GUI launch seam
+- `wsl.exe --shutdown` to clear stale MVSim runtime/server state before the final GUI validation attempt
+- background launch of:
+  - `python scripts/run_mvsim_gui_review.py --config configs/sim_harness.yaml`
+  - `python scripts/run_sim_pose_ingress_server.py --config configs/sim_harness.yaml --host 127.0.0.1 --port 8110`
+- successful attach validation with:
+  - `python scripts/run_mvsim_live_bridge_demo.py --config configs/sim_harness.yaml --base-url http://127.0.0.1:8110 --sample-count 3 --attach-existing-runtime`
+- process inspection to confirm the non-headless WSL runtime command was actually launched
+
+## Acceptance Criteria Check
+
+- the round attempts one real GUI MVSim launch path on this PC: yes
+- the round identifies the narrowest truthful operator path for GUI review: yes
+- if GUI launch works, the round proves at least one current Windows-side consumer can attach to that already-running runtime: yes
+- the round records whether a visible GUI review path is now available for a human operator: yes
+- the round preserves the already-validated headless live-runtime path: yes
+- `coordination/latest_result.md` is updated with exact commands, observed results, and the true blocker state if any: yes
+
+## Reviewer-Subagent Conclusion
+
+- Reviewer result: `PASS`
+- Reviewer confirmed:
+  - the Round 050 requirements are satisfied
+  - the final deliverable stays within scope
+  - remaining risk is limited to GUI window visibility being inferred from a successful non-headless WSLg launch rather than directly witnessed by the terminal-only executor session
+
+## Blockers / Risks / Remaining Gaps
+
+- the executor could not directly visually inspect the desktop, so GUI window visibility is inferred from the successful non-headless WSLg runtime launch rather than directly seen
+- the current harness live-validation path remains headless-oriented; this round did not convert the harness to attach to an already-running GUI runtime
+- the GUI operator path depends on clearing stale WSL MVSim runtime/server state first, which is why the launcher keeps the cleanup step
+
+## Round Outcome
+
+- This round ended in:
+  - `mvsim_gui_review_path_ready`
 
 ## Git Delivery Status
 
 - Branch: `main`
+- Current `git status --short --branch` before staging:
+
+```text
+## main...origin/main
+ M docs/MVSIM_LIVE_POSE_BRIDGE.md
+ M coordination/latest_result.md
+?? scripts/run_mvsim_gui_review.py
+```
+
+- Current HEAD before any new Round 050 commit:
+  - `8bd3f35`
 - Round implementation commit:
-  - `a66e61ba892599f6b2a00d0048ce6641208e91f7`
+  - `ab8a7f6e0ced572e50c93c86847be5a0335931e3`
 - Round implementation commit message:
-  - `fix: harden WSL subprocess decoding on Windows`
-- Round implementation push successful:
-  - yes
-- Current worktree after the implementation push and before committing this result file:
-  - `M coordination/latest_prompt.md`
-  - `M coordination/latest_result.md`
+  - `feat: add mvsim gui review launcher`
 - Files staged: no
 - Files committed in this round:
-  - yes, implementation commit pushed
-- Files pushed in this round:
-  - yes, implementation commit pushed to `origin/main`
+  - yes, the GUI launcher + doc update commit has already been created
+- Push succeeded in this round:
+  - yes, the implementation commit has already been pushed to `origin/main`
+- Current worktree after that push and before committing this result file:
+
+```text
+## main...origin/main
+ M coordination/latest_result.md
+```
