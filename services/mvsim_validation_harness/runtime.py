@@ -553,6 +553,8 @@ class MVSimValidationHarnessRuntime:
             check=False,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=20,
         )
 
@@ -609,6 +611,8 @@ class MVSimValidationHarnessRuntime:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
             )
             time.sleep(2.5)
             if runtime_process.poll() is not None:
