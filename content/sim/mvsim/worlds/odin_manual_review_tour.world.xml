@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<mvsim_world version="1.0">
+  <simul_timestep>0</simul_timestep>
+
+  <gui>
+    <show_forces>false</show_forces>
+    <show_sensor_points>false</show_sensor_points>
+  </gui>
+
+  <element class="horizontal_plane">
+    <elevation>0</elevation>
+    <color>#EBEBEB</color>
+    <x_min>-8</x_min>
+    <x_max>12</x_max>
+    <y_min>-6</y_min>
+    <y_max>6</y_max>
+    <texture_size>8</texture_size>
+  </element>
+
+  <element class="ground_grid">
+    <floating>true</floating>
+    <color>#A6A6A6</color>
+  </element>
+
+  <include file="../definitions/odin_tour_bot.vehicle.xml" />
+
+  <!-- Round 051 manual review world: start just before the first POI and wait for keyboard control. -->
+  <vehicle name="tour_bot" class="odin_tour_bot">
+    <init_pose>-2.0 0.5 0.0</init_pose>
+    <publish>
+      <publish_pose_topic>/tour_bot/pose</publish_pose_topic>
+      <publish_pose_period>0.10</publish_pose_period>
+    </publish>
+  </vehicle>
+
+  <walls>
+    <color>#505050</color>
+    <wallThickness>0.12</wallThickness>
+    <wallHeight>1.0</wallHeight>
+    <shape>
+      <pt>-4.0 -3.0</pt> <pt>9.5 -3.0</pt>
+      <pt>9.5 -3.0</pt> <pt>9.5 3.0</pt>
+      <pt>9.5 3.0</pt> <pt>-4.0 3.0</pt>
+      <pt>-4.0 3.0</pt> <pt>-4.0 -3.0</pt>
+      <pt>-0.5 -3.0</pt> <pt>-0.5 0.8</pt>
+    </shape>
+  </walls>
+</mvsim_world>

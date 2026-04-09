@@ -262,13 +262,13 @@
         <h2>API Connection</h2>
         <div>
           <label class="label" for="apiBaseUrl">API Base URL</label>
-          <input id="apiBaseUrl" type="text" autocomplete="off" spellcheck="false" value="http://127.0.0.1:8000">
+          <input id="apiBaseUrl" type="text" autocomplete="off" spellcheck="false" value="">
         </div>
         <div class="row">
           <button id="saveBaseUrl" class="ghost" type="button">Save API URL</button>
           <button id="usePageOrigin" class="ghost" type="button">Use Page Origin</button>
         </div>
-        <p class="hint">For Android, change this to your laptop or Orin NX LAN address, for example `http://192.168.1.20:8000`.</p>
+        <p class="hint">For Android, change this to your laptop or Orin NX LAN address, for example `http://192.168.1.20:8001`.</p>
         <label class="toggle">
           <input id="autoRefresh" type="checkbox" checked>
           <span>Auto refresh every 3 seconds</span>
@@ -344,11 +344,21 @@
     let autoRefreshHandle = null;
 
     function initialBaseUrl() {
+      const pageOrigin = normalizeBaseUrl(window.location.origin || "");
       const saved = window.localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        return saved;
+        const normalizedSaved = normalizeBaseUrl(saved);
+        if (
+          pageOrigin &&
+          ["http://127.0.0.1:8000", "http://localhost:8000"].includes(normalizedSaved) &&
+          normalizedSaved !== pageOrigin
+        ) {
+          window.localStorage.setItem(STORAGE_KEY, pageOrigin);
+          return pageOrigin;
+        }
+        return normalizedSaved;
       }
-      return "http://127.0.0.1:8000";
+      return pageOrigin || "http://127.0.0.1:8000";
     }
 
     function normalizeBaseUrl(url) {

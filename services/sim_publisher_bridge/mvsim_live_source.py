@@ -1,48 +1,52 @@
 import subprocess
-from pathlib import Path
-from typing import Dict, Iterator, List, Optional
+from typing import Dict, Iterable, Iterator, List, Optional
 
 from services.sim_publisher_bridge.source import SimulatorPoseSource
 
 
-def parse_time_stamped_pose_blocks(text: str) -> List[Dict]:
-    samples: List[Dict] = []
+def _build_pose_sample(current: Dict[str, object]) -> Optional[Dict]:
+    if "x" not in current or "y" not in current:
+        return None
+    return {
+        "label": current.get("object_id"),
+        "position": {
+            "x": float(current.get("x", 0.0)),
+            "y": float(current.get("y", 0.0)),
+            "z": float(current.get("z", 0.0)),
+        },
+        "orientation": {
+            "yaw_rad": float(current.get("yaw", 0.0)),
+        },
+        "mvsim": {
+            "object_id": current.get("object_id"),
+            "topic_name": current.get("topic_name"),
+            "message_type": current.get("message_type", "mvsim_msgs.TimeStampedPose"),
+            "unix_timestamp": float(current.get("unix_timestamp", 0.0)),
+            "frame_id": current.get("frame_id", "map"),
+            "runtime_mode": "wsl_live_topic_echo",
+        },
+    }
+
+
+def iter_time_stamped_pose_samples(lines: Iterable[str]) -> Iterator[Dict]:
     current: Dict[str, object] = {}
     in_pose = False
 
-    def finalize() -> None:
+    def finalize() -> Optional[Dict]:
         nonlocal current, in_pose
-        if "x" in current and "y" in current:
-            samples.append(
-                {
-                    "label": current.get("object_id"),
-                    "position": {
-                        "x": float(current.get("x", 0.0)),
-                        "y": float(current.get("y", 0.0)),
-                        "z": float(current.get("z", 0.0)),
-                    },
-                    "orientation": {
-                        "yaw_rad": float(current.get("yaw", 0.0)),
-                    },
-                    "mvsim": {
-                        "object_id": current.get("object_id"),
-                        "topic_name": current.get("topic_name"),
-                        "message_type": current.get("message_type", "mvsim_msgs.TimeStampedPose"),
-                        "unix_timestamp": float(current.get("unix_timestamp", 0.0)),
-                        "frame_id": current.get("frame_id", "map"),
-                        "runtime_mode": "wsl_live_topic_echo",
-                    },
-                }
-            )
+        sample = _build_pose_sample(current)
         current = {}
         in_pose = False
+        return sample
 
-    for raw_line in text.splitlines():
+    for raw_line in lines:
         line = raw_line.strip()
         if not line:
             continue
         if line.startswith("[") and "Received data" in line:
-            finalize()
+            sample = finalize()
+            if sample is not None:
+                yield sample
             continue
         if line.startswith("unixTimestamp:"):
             current["unix_timestamp"] = float(line.split(":", 1)[1].strip())
@@ -65,8 +69,13 @@ def parse_time_stamped_pose_blocks(text: str) -> List[Dict]:
             except ValueError:
                 current[key.strip()] = value.strip()
 
-    finalize()
-    return samples
+    sample = finalize()
+    if sample is not None:
+        yield sample
+
+
+def parse_time_stamped_pose_blocks(text: str) -> List[Dict]:
+    return list(iter_time_stamped_pose_samples(text.splitlines()))
 
 
 class WslMVSimTopicEchoSource(SimulatorPoseSource):
@@ -76,7 +85,7 @@ class WslMVSimTopicEchoSource(SimulatorPoseSource):
         user: str,
         executable_path: str,
         topic_name: str,
-        sample_limit: int = 3,
+        sample_limit: Optional[int] = 3,
         timeout_sec: float = 5.0,
     ) -> None:
         self._distribution = distribution
@@ -110,16 +119,14 @@ class WslMVSimTopicEchoSource(SimulatorPoseSource):
             errors="replace",
             bufsize=1,
         )
-        collected: List[str] = []
+        yielded_count = 0
         try:
             if process.stdout is None:
                 return
-            for line in process.stdout:
-                collected.append(line)
-                samples = parse_time_stamped_pose_blocks("".join(collected))
-                if len(samples) >= self._sample_limit:
-                    for item in samples[: self._sample_limit]:
-                        yield item
+            for sample in iter_time_stamped_pose_samples(process.stdout):
+                yield sample
+                yielded_count += 1
+                if self._sample_limit is not None and yielded_count >= self._sample_limit:
                     return
         finally:
             process.terminate()

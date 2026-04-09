@@ -27,6 +27,9 @@ class SimIngressHttpClient:
     def start_runtime(self) -> dict:
         return self._post_json("/runtime/start", {})
 
+    def ingest_pose(self, pose: dict) -> dict:
+        return self._post_json("/poses", pose)
+
     def ingest_pose_batch(self, poses: list) -> dict:
         return self._post_json("/poses/batch", {"poses": poses})
 

@@ -12,6 +12,7 @@ from services.sim_publisher_bridge.http_client import SimIngressHttpClient
 from services.sim_publisher_bridge.mvsim_live import summarize_live_bridge_result
 from services.sim_publisher_bridge.mvsim_live_source import (
     describe_mvsim_live_pose_source,
+    iter_time_stamped_pose_samples,
     parse_time_stamped_pose_blocks,
 )
 from services.sim_publisher_bridge.runtime import SimulatorPublisherBridgeRuntime
@@ -67,6 +68,36 @@ class MVSimLiveBridgeTests(unittest.TestCase):
         self.assertEqual(samples[0]["position"]["y"], -1.5)
         self.assertEqual(samples[0]["orientation"]["yaw_rad"], 0.0)
         self.assertEqual(samples[0]["mvsim"]["message_type"], "mvsim_msgs.TimeStampedPose")
+
+    def test_iter_time_stamped_pose_samples_supports_incremental_streaming(self) -> None:
+        lines = [
+            "[2026/04/06,18:08:41.564584] Received data :\n",
+            " - typeName: mvsim_msgs.TimeStampedPose\n",
+            "unixTimestamp: 1775470121.5642531\n",
+            'objectId: "tour_bot"\n',
+            "pose {\n",
+            "  x: -3\n",
+            "  y: -1.5\n",
+            "  z: 0\n",
+            "  yaw: 0\n",
+            "}\n",
+            "[2026/04/06,18:08:41.664584] Received data :\n",
+            " - typeName: mvsim_msgs.TimeStampedPose\n",
+            "unixTimestamp: 1775470121.6642532\n",
+            'objectId: "tour_bot"\n',
+            "pose {\n",
+            "  x: -2.5\n",
+            "  y: -1.5\n",
+            "  z: 0\n",
+            "  yaw: 0\n",
+            "}\n",
+        ]
+
+        samples = list(iter_time_stamped_pose_samples(lines))
+
+        self.assertEqual(len(samples), 2)
+        self.assertEqual(samples[0]["position"]["x"], -3.0)
+        self.assertEqual(samples[1]["position"]["x"], -2.5)
 
     def test_live_bridge_runtime_relays_live_pose_shape_into_ingress(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

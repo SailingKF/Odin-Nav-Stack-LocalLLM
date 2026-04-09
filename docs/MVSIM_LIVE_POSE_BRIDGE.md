@@ -120,47 +120,54 @@ The demo script:
 
 ## GUI Manual Review Flow
 
-For a visible MVSim operator review on this Windows + WSLg machine, keep the validated headless path unchanged and use a separate GUI launcher terminal:
-
-Terminal 1:
+Round 051 keeps the validated headless path unchanged and adds one narrower operator path for this Windows + WSLg machine:
 
 ```text
-python scripts/run_mvsim_gui_review.py --config configs/sim_harness.yaml
+python scripts/run_mvsim_gui_review.py --config configs/sim_harness_manual_review.yaml --open-browser
 ```
 
-This launcher:
+This single command now:
 
-- starts the repo-owned live-validation world with GUI instead of `--headless`
-- cleans up an older MVSim WSL runtime first unless `--reuse-existing-runtime` is used
-- prints the exact follow-up commands for the current config
-- keeps the GUI runtime alive until the operator stops that terminal
+- starts `sim_pose_ingress_server` locally when the expected `8110` endpoint is not already healthy
+- starts the sim-profile API server locally when the expected `8001` endpoint is not already healthy
+- launches the repo-owned manual-review MVSim world with GUI instead of `--headless`
+- starts a continuous live-pose relay into `sim_pose_ingress`
+- optionally opens `/debug`
+- keeps the stack alive until the operator stops the launcher terminal
 
-Then attach the existing GUI runtime from separate Windows terminals:
+Current manual-review assets:
 
-Terminal 2:
+- config:
+  - `configs/sim_harness_manual_review.yaml`
+- world:
+  - `content/sim/mvsim/worlds/odin_manual_review_tour.world.xml`
+- vehicle:
+  - `content/sim/mvsim/definitions/odin_tour_bot.vehicle.xml`
 
-```text
-python scripts/run_sim_pose_ingress_server.py --config configs/sim_harness.yaml --host 127.0.0.1 --port 8110
-```
+The manual-review world intentionally differs from the automated validation world:
 
-Terminal 3:
+- the robot does not auto-drive to completion
+- the start pose is set just before the first POI
+- the operator is expected to focus the MVSim window and drive with:
+  - `W` / `S`
+  - `A` / `D`
+  - `Space`
 
-```text
-python scripts/run_mvsim_live_bridge_demo.py --config configs/sim_harness.yaml --base-url http://127.0.0.1:8110 --sample-count 180 --attach-existing-runtime
-```
+Expected review surfaces:
 
-Optional API visibility in another terminal:
-
-```text
-python scripts/run_api_server.py --config configs/sim_harness.yaml --host 127.0.0.1 --port 8001
-```
+- MVSim GUI window
+- `/debug` on:
+  - `http://127.0.0.1:8001/debug`
 
 Notes:
 
-- the GUI review path uses the same `odin_live_multistop_tour.world.xml` validation asset
-- the attach path stays repo-owned by reusing `run_mvsim_live_bridge_demo.py --attach-existing-runtime`
+- the `/debug` page now defaults to the page origin in this flow, so serving it from `8001` no longer requires manual API URL correction from the old `8000` default
+- the launcher still uses the repo-owned WSL `cd ... && mvsim launch ...` seam so the repo path with spaces remains safe
 - the current harness/runtime validation path still remains headless-oriented; this GUI path is for operator review, not a replacement for the existing automated live-validation seam
-- the WSL repo mount path contains spaces, so the GUI launcher intentionally `cd`s into the repo first and launches the world by repo-relative path
+- the automated live-validation asset remains:
+  - `content/sim/mvsim/worlds/odin_live_multistop_tour.world.xml`
+- the continuous GUI review relay is intentionally separate from the batch demo script:
+  - `scripts/run_mvsim_live_bridge_stream.py`
 
 ## What Was Truthfully Validated
 

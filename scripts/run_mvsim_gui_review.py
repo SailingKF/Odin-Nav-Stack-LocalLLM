@@ -4,6 +4,10 @@ from pathlib import Path
 import shlex
 import subprocess
 import sys
+import time
+from typing import Optional
+from urllib.request import Request, urlopen
+import webbrowser
 
 import yaml
 
@@ -35,11 +39,28 @@ def _config_display_path(config_path: Path) -> str:
         return str(config_path)
 
 
-def _service_command(config_path: Path, script_name: str, host: str, port: int) -> str:
-    return (
-        f"python scripts/{script_name} --config {_config_display_path(config_path)} "
-        f"--host {host} --port {port}"
-    )
+def _service_command(config_path: Path, script_name: str, host: str, port: int) -> list[str]:
+    return [
+        sys.executable,
+        str(REPO_ROOT / "scripts" / script_name),
+        "--config",
+        _config_display_path(config_path),
+        "--host",
+        host,
+        "--port",
+        str(port),
+    ]
+
+
+def _build_bridge_command(config_path: Path, base_url: str) -> list[str]:
+    return [
+        sys.executable,
+        str(REPO_ROOT / "scripts" / "run_mvsim_live_bridge_stream.py"),
+        "--config",
+        _config_display_path(config_path),
+        "--base-url",
+        base_url,
+    ]
 
 
 def _build_gui_launch_command(probe: dict, repo_root: Path, verbosity: str) -> list[str]:
@@ -86,12 +107,68 @@ def _cleanup_existing_runtime(probe: dict) -> None:
     )
 
 
+def _health_json(url: str) -> Optional[dict]:
+    try:
+        request = Request(url=url, method="GET")
+        with urlopen(request, timeout=2.5) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return None
+
+
+def _wait_for_health(url: str, process: Optional[subprocess.Popen], timeout_sec: float = 15.0) -> dict:
+    deadline = time.time() + timeout_sec
+    while time.time() < deadline:
+        payload = _health_json(url)
+        if payload is not None:
+            return payload
+        if process is not None and process.poll() is not None:
+            raise RuntimeError(f"Service for {url} exited before becoming healthy (exit={process.returncode}).")
+        time.sleep(0.4)
+    raise RuntimeError(f"Timed out waiting for health endpoint: {url}")
+
+
+def _ensure_local_service(
+    service_name: str,
+    health_url: str,
+    command: list[str],
+) -> tuple[Optional[subprocess.Popen], str, dict]:
+    existing = _health_json(health_url)
+    if existing is not None:
+        return None, "attached_existing", existing
+
+    process = subprocess.Popen(command, cwd=str(REPO_ROOT))
+    health = _wait_for_health(health_url, process)
+    return process, "launched_local", health
+
+
+def _terminate_process(process: Optional[subprocess.Popen], label: str) -> None:
+    if process is None or process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5)
+    print(json.dumps({"terminated": label}, ensure_ascii=False))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Launch the repo-owned MVSim live-validation world with GUI for manual review."
+        description="Run the repo-owned interactive MVSim GUI review stack with one command."
     )
-    parser.add_argument("--config", default=str(REPO_ROOT / "configs" / "sim_harness.yaml"), help="Config file to load.")
+    parser.add_argument(
+        "--config",
+        default=str(REPO_ROOT / "configs" / "sim_harness_manual_review.yaml"),
+        help="Config file to load.",
+    )
     parser.add_argument("--verbosity", default="INFO", help="MVSim verbosity level.")
+    parser.add_argument(
+        "--open-browser",
+        action="store_true",
+        help="Open the repo-owned /debug page after the local stack becomes healthy.",
+    )
     parser.add_argument(
         "--reuse-existing-runtime",
         action="store_true",
@@ -118,46 +195,92 @@ def main() -> int:
     api_endpoint = dict(service_endpoints.get("api_server") or {})
     ingress_host = str(ingress_endpoint.get("bind_host", "127.0.0.1"))
     ingress_port = int(ingress_endpoint.get("port", 8110))
+    ingress_url = f"http://{ingress_host}:{ingress_port}"
     api_host = str(api_endpoint.get("bind_host", "127.0.0.1"))
     api_port = int(api_endpoint.get("port", 8001))
-    launch_command = _build_gui_launch_command(probe, REPO_ROOT, args.verbosity)
+    api_url = f"http://{api_host}:{api_port}"
+    debug_url = f"{api_url}/debug"
 
-    review_sheet = {
-        "gui_runtime": {
-            "launcher": "scripts/run_mvsim_gui_review.py",
-            "config": _config_display_path(config_path),
-            "launch_command": launch_command,
-            "world_file": probe.get("world_file"),
-            "world_file_wsl": probe.get("world_file_wsl"),
-        },
-        "follow_up_commands": {
-            "sim_pose_ingress_server": _service_command(
-                config_path, "run_sim_pose_ingress_server.py", ingress_host, ingress_port
-            ),
-            "api_server_optional": _service_command(config_path, "run_api_server.py", api_host, api_port),
-            "attach_existing_runtime_bridge": (
-                f"python scripts/run_mvsim_live_bridge_demo.py --config {_config_display_path(config_path)} "
-                f"--base-url http://{ingress_host}:{ingress_port} --sample-count 180 --attach-existing-runtime"
-            ),
-        },
-        "operator_note": (
-            "Leave this GUI launcher terminal running while a second terminal starts the ingress server "
-            "and a third terminal runs the attach-existing-runtime bridge command."
-        ),
-    }
-    print(json.dumps(review_sheet, ensure_ascii=False, indent=2))
+    ingress_process = None
+    api_process = None
+    bridge_process = None
+    runtime_process = None
 
-    runtime_process = subprocess.Popen(launch_command)
     try:
+        ingress_process, ingress_mode, ingress_health = _ensure_local_service(
+            "sim_pose_ingress_server",
+            f"{ingress_url}/health",
+            _service_command(config_path, "run_sim_pose_ingress_server.py", ingress_host, ingress_port),
+        )
+        api_process, api_mode, api_health = _ensure_local_service(
+            "api_server",
+            f"{api_url}/health",
+            _service_command(config_path, "run_api_server.py", api_host, api_port),
+        )
+
+        launch_command = _build_gui_launch_command(probe, REPO_ROOT, args.verbosity)
+        runtime_process = subprocess.Popen(launch_command, cwd=str(REPO_ROOT))
+        time.sleep(2.5)
+        if runtime_process.poll() is not None:
+            raise RuntimeError(f"MVSim GUI runtime exited early (exit={runtime_process.returncode}).")
+
+        bridge_process = subprocess.Popen(
+            _build_bridge_command(config_path, ingress_url),
+            cwd=str(REPO_ROOT),
+        )
+        time.sleep(2.0)
+        if bridge_process.poll() is not None:
+            raise RuntimeError(f"Live bridge stream exited early (exit={bridge_process.returncode}).")
+
+        review_sheet = {
+            "gui_runtime": {
+                "launcher": "scripts/run_mvsim_gui_review.py",
+                "config": _config_display_path(config_path),
+                "launch_command": launch_command,
+                "world_file": probe.get("world_file"),
+                "world_file_wsl": probe.get("world_file_wsl"),
+            },
+            "local_stack": {
+                "sim_pose_ingress": {
+                    "status": ingress_mode,
+                    "health_url": f"{ingress_url}/health",
+                    "health": ingress_health,
+                },
+                "api_server": {
+                    "status": api_mode,
+                    "health_url": f"{api_url}/health",
+                    "health": api_health,
+                    "debug_url": debug_url,
+                },
+                "bridge_stream": {
+                    "status": "launched_local",
+                    "command": _build_bridge_command(config_path, ingress_url),
+                },
+            },
+            "operator_note": (
+                "Focus the MVSim window, keep tour_bot selected, and use W/S to move, A/D to turn, "
+                "and Space to stop. The /debug page should use the page origin by default in this flow."
+            ),
+        }
+        print(json.dumps(review_sheet, ensure_ascii=False, indent=2))
+
+        if args.open_browser:
+            webbrowser.open(debug_url)
+
+        print("====================================================")
+        print("Interactive MVSim manual review stack is running.")
+        print(f"Debug page: {debug_url}")
+        print("Focus the MVSim window and drive with W/S/A/D, Space to stop.")
+        print("Press CTRL+C in this launcher terminal to stop the local review stack.")
+        print("====================================================")
         return runtime_process.wait()
     except KeyboardInterrupt:
-        runtime_process.terminate()
-        try:
-            runtime_process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            runtime_process.kill()
-            runtime_process.wait(timeout=5)
         return 130
+    finally:
+        _terminate_process(bridge_process, "bridge_stream")
+        _terminate_process(runtime_process, "gui_runtime")
+        _terminate_process(api_process, "api_server")
+        _terminate_process(ingress_process, "sim_pose_ingress_server")
 
 
 if __name__ == "__main__":
