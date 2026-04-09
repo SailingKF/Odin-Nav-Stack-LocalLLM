@@ -1,267 +1,194 @@
 # Current Round Result
 
 ## Round
-Round 048 - Compatibility Shim Validation And Comparison Export Closure
+Round 049 - Windows WSL Subprocess Decode Cleanup
 
 ## Goal
-Run one fresh `compatibility_shim` harness validation on this PC and re-read the comparison/export surfaces so the latest live-vs-compatibility comparison can close truthfully.
+Remove the remaining Windows-side `UnicodeDecodeError` risk while reading WSL subprocess output, without changing the validated live-runtime behavior.
 
 ## Summary
 
-- Status: `compatibility_comparison_closed`
-- A fresh `compatibility_shim` harness validation report was written successfully.
-- The latest comparison/export surfaces no longer report `missing_reports`.
-- The latest comparison now reports a real live-vs-compatibility comparison with:
-  - `status = "ready"`
-  - `comparison_available = true`
-  - `comparability_status = "comparable"`
-- No source-code or doc change was required in this round.
+- Status: `windows_wsl_decode_cleanup_completed`
+- The concrete decode seam was the Windows host reading WSL subprocess output with `text=True` and the platform default codec.
+- The fix was kept local to the live-runtime harness seam by explicitly decoding those subprocess streams as UTF-8 with replacement for undecodable bytes.
+- `python scripts/print_mvsim_live_probe.py --config configs/sim_harness.yaml` still reports `effective_mode = "live_runtime"`.
+- A representative live-runtime validation still passed after the change.
+- No `UnicodeDecodeError` was observed in the validation command output or in the newest relevant harness log/report files checked for this round.
 
-## What I Did
+## Exact Subprocess / Decode Seam Fixed
 
-- Re-ran the current repo live-runtime probe:
-  - `python scripts/print_mvsim_live_probe.py --config configs/sim_harness.yaml`
-- Started the existing harness server on the same isolated harness port used in Round 047:
-  - `python scripts/run_mvsim_validation_harness.py --config configs/sim_harness.yaml --host 127.0.0.1 --port 8301`
-- Re-read the harness state before the compatibility run:
-  - `GET http://127.0.0.1:8301/health`
-  - `GET http://127.0.0.1:8301/status`
-- Triggered a fresh compatibility validation:
-  - `POST http://127.0.0.1:8301/validation/run`
-  - request body:
-    - `validation_mode = "compatibility_shim"`
-    - `question = "What does this final stop prove?"`
-- Re-read the comparison/report surfaces after that validation:
-  - `GET http://127.0.0.1:8301/status`
-  - `GET http://127.0.0.1:8301/reports/latest`
-  - `GET http://127.0.0.1:8301/reports/recent?limit=5`
-  - `GET http://127.0.0.1:8301/reports/compare`
-  - `POST http://127.0.0.1:8301/reports/compare/export`
-  - `POST http://127.0.0.1:8301/services/stop`
-- Updated this handoff file:
-  - `coordination/latest_result.md`
+- `services/mvsim_validation_harness/runtime.py`
+  - `_cleanup_existing_live_runtime()`
+  - `_run_live_bridge_validation()`
+- `services/sim_publisher_bridge/mvsim_live_source.py`
+  - `WslMVSimTopicEchoSource.iter_payloads()`
 
-## Exact Files Changed
+Before this round, those WSL subprocess calls relied on Windows default text decoding.
+This was the same seam previously associated with `UnicodeDecodeError: 'gbk' codec can't decode byte ...` in the Round 047 harness stderr capture.
 
-- Repo file changed:
-  - `coordination/latest_result.md`
+## Actual Files Changed
+
+- `AGENTS.md`
+- `coordination/latest_result.md`
+- `services/mvsim_validation_harness/runtime.py`
+- `services/sim_publisher_bridge/mvsim_live_source.py`
+
+## Modification Summary
+
+- Added repo-root coordination guidance to `AGENTS.md` so executor rounds must read `coordination/bootstrap_prompt.md` and `coordination/latest_prompt.md`, respect the round state machine, and keep subagent usage bounded.
+- Updated the WSL subprocess call sites in `services/mvsim_validation_harness/runtime.py` to use:
+  - `encoding="utf-8"`
+  - `errors="replace"`
+- Updated the WSL topic-echo subprocess in `services/sim_publisher_bridge/mvsim_live_source.py` to use:
+  - `encoding="utf-8"`
+  - `errors="replace"`
+- Recorded the truthful Round 049 outcome in `coordination/latest_result.md`.
 
 ## Exact Commands Used
 
 ```text
+python -m unittest tests.test_mvsim_validation_harness -v
 python scripts/print_mvsim_live_probe.py --config configs/sim_harness.yaml
-python scripts/run_mvsim_validation_harness.py --config configs/sim_harness.yaml --host 127.0.0.1 --port 8301
-GET  http://127.0.0.1:8301/health
-GET  http://127.0.0.1:8301/status
-POST http://127.0.0.1:8301/validation/run {"validation_mode":"compatibility_shim","question":"What does this final stop prove?"}
-GET  http://127.0.0.1:8301/status
-GET  http://127.0.0.1:8301/reports/latest
-GET  http://127.0.0.1:8301/reports/recent?limit=5
-GET  http://127.0.0.1:8301/reports/compare
-POST http://127.0.0.1:8301/reports/compare/export
-POST http://127.0.0.1:8301/services/stop
+python - <<'PY'
+from pathlib import Path
+import json
+from services.mvsim_validation_harness.runtime import MVSimValidationHarnessRuntime
+
+repo = Path.cwd()
+runtime = MVSimValidationHarnessRuntime(
+    config_path=repo / "configs" / "sim_harness.yaml",
+    repo_root=repo,
+    harness_url="http://127.0.0.1:8300",
+)
+try:
+    result = runtime.run_validation(validation_mode="live_runtime")
+    print(json.dumps({
+        "status": result.get("status"),
+        "validation_mode": result.get("validation_mode"),
+        "mvsim_mode": result.get("mvsim_mode"),
+        "route_completed": bool((result.get("bridge_result") or {}).get("final_state", {}).get("route_completed")),
+        "live_first_poi_hit_occurred": bool((result.get("live_validation_summary") or {}).get("live_first_poi_hit_occurred")),
+        "live_second_poi_hit_occurred": bool((result.get("live_validation_summary") or {}).get("live_second_poi_hit_occurred")),
+        "report_path": result.get("report_path"),
+    }, ensure_ascii=False, indent=2))
+finally:
+    print(json.dumps({"stop_result": runtime.stop_local_stack()}, ensure_ascii=False, indent=2))
+PY
+Get-ChildItem session_logs/mvsim_validation_harness -Recurse -File | Sort-Object LastWriteTime -Descending | Select-Object -First 12 FullName,LastWriteTime
+Get-ChildItem session_logs/mvsim_validation_harness -Recurse -File | Sort-Object LastWriteTime -Descending | Select-Object -First 12 -ExpandProperty FullName | ForEach-Object { "`n=== $_ ==="; Select-String -Path $_ -Pattern 'UnicodeDecodeError|gbk codec|Traceback' -SimpleMatch }
 ```
 
 ## Exact Observed Results
+
+### `python -m unittest tests.test_mvsim_validation_harness -v`
+
+- Result: `OK`
+- Tests run: `8`
+- Failures: `0`
+- Errors: `0`
 
 ### `python scripts/print_mvsim_live_probe.py --config configs/sim_harness.yaml`
 
 - `configured_mode = "live_runtime"`
 - `effective_mode = "live_runtime"`
-- `live_runtime.runtime_host = "wsl"`
 - `live_runtime.runtime_available = true`
 - `live_runtime.wsl_distribution = "Ubuntu"`
 - `live_runtime.wsl_user = "root"`
 - `live_runtime.wsl_executable_path = "/root/round033-mvsim-build/bin/mvsim"`
 - `live_runtime.blocker = null`
-- `live_runtime.runtime_check.returncode = 0`
-- `wsl_enablement.wsl_installed = true`
-- `compatibility_source.source_kind = "mvsim_compatibility_shim"`
 
-### Harness Status Checks Used For `compatibility_shim`
+### Representative Live-Runtime Validation
 
-- Pre-run `GET /status` showed:
-  - `selected_validation_mode = "live_runtime"`
-  - `sim_pose_ingress.status = "healthy"`
-  - `api_server.status = "healthy"`
-  - `debug_page.status = "healthy"`
-  - `latest_report.report_id = "20260408T121633Z-live_runtime"`
-  - `latest_comparison.status = "missing_reports"`
-  - `latest_comparison.comparability_status = "unknown"`
-- This means the comparison closure was still open before the new compatibility run, but the isolated local services were already reachable and the harness used the attach-existing path for this round.
-
-### Harness Run Result For `compatibility_shim`
-
-- `status = "passed"`
-- `validation_mode = "compatibility_shim"`
-- `mvsim_mode = "compatibility_shim"`
-- `mvsim_mode_summary.configured_mode = "compatibility_shim"`
-- `mvsim_mode_summary.effective_mode = "compatibility_shim"`
-- `mvsim_mode_summary.compatibility_source.source_kind = "mvsim_compatibility_shim"`
-- `validation_report.report_id = "20260408T123521Z-compatibility_shim"`
-- `validation_report.report_path = "D:\\Vibe Coding Projects\\Odin-Nav-Stack-LocalLLM\\session_logs\\mvsim_validation_harness\\reports\\20260408T123521Z-compatibility_shim.json"`
-- `validation_report.passed = true`
-- `validation_report.session_id = "mock_tour_20260408T123521Z"`
-- `validation_report.latest_spot_id = "gallery"`
-- `validation_report.latest_spot_name = "History Gallery"`
-- `validation_report.latest_pose = {"x": 9.5, "y": -0.5, "label": "gallery_inside"}`
-- `validation_report.route_completed = true`
-- `validation_report.live_first_poi_hit_occurred = false`
-- `validation_report.live_second_poi_hit_occurred = false`
-- `validation_report.live_second_narration_occurred = false`
-- `validation_report.recent_triggered_spot_ids = ["gate", "plaza", "gallery"]`
-- `validation_report.recent_narrated_spot_ids = ["gate", "plaza", "gallery"]`
-- `validation_report.mvsim_source_kind = "mvsim_compatibility_shim"`
-- `question_result.ok = true`
-- `question_result.answer_text = "It proves that the route can finish cleanly after several narrations without duplicate triggers."`
-
-### `GET /reports/latest`
-
-- Returned the fresh compatibility report:
-  - `report_id = "20260408T123521Z-compatibility_shim"`
+- Command path used:
+  - inline Python invoking `MVSimValidationHarnessRuntime(...).run_validation(validation_mode="live_runtime")`
+- Observed result:
   - `status = "passed"`
-  - `validation_mode = "compatibility_shim"`
+  - `validation_mode = "live_runtime"`
+  - `mvsim_mode = "live_runtime"`
   - `route_completed = true`
-  - `latest_spot_name = "History Gallery"`
-  - `report_path = "D:\\Vibe Coding Projects\\Odin-Nav-Stack-LocalLLM\\session_logs\\mvsim_validation_harness\\reports\\20260408T123521Z-compatibility_shim.json"`
+  - `live_first_poi_hit_occurred = true`
+  - `live_second_poi_hit_occurred = true`
+- The same inline command also stopped the managed local services successfully:
+  - `stop_result.ok = true`
+  - `stop_result.stopped_services = ["sim_pose_ingress_server", "api_server"]`
 
-### `GET /reports/recent`
+### Newest Relevant Report / Log Files Checked
 
-- Returned recent reports in this order:
-  - `20260408T123521Z-compatibility_shim`
-  - `20260408T121633Z-live_runtime`
-  - `20260408T092650Z-live_runtime`
-- The two reports relevant to the new comparison are:
-  - fresh compatibility report:
-    - `D:\\Vibe Coding Projects\\Odin-Nav-Stack-LocalLLM\\session_logs\\mvsim_validation_harness\\reports\\20260408T123521Z-compatibility_shim.json`
-  - fresh live report from Round 047:
-    - `D:\\Vibe Coding Projects\\Odin-Nav-Stack-LocalLLM\\session_logs\\mvsim_validation_harness\\reports\\20260408T121633Z-live_runtime.json`
+- Latest live report:
+  - `D:\Vibe Coding Projects\Odin-Nav-Stack-LocalLLM\session_logs\mvsim_validation_harness\reports\20260409T060307Z-live_runtime.json`
+- Latest service stderr logs:
+  - `D:\Vibe Coding Projects\Odin-Nav-Stack-LocalLLM\session_logs\mvsim_validation_harness\api_server.stderr.log`
+  - `D:\Vibe Coding Projects\Odin-Nav-Stack-LocalLLM\session_logs\mvsim_validation_harness\sim_pose_ingress_server.stderr.log`
 
-### `GET /reports/compare`
+### Decode Failure Check
 
-- Returned:
-  - `status = "ready"`
-  - `comparison_available = true`
-  - `missing_modes = []`
-  - `comparability_status = "comparable"`
-- Key guardrail reason:
-  - `required validation assets match across the latest live and compatibility reports`
-- Checked identity fields all matched:
-  - `route_file`
-  - `poi_file`
-  - `world_file`
-  - `vehicle_name`
-  - `alignment_strategy`
-  - `motion_strategy`
-  - `config_name`
-  - `config_path`
-- Truthful difference flags:
-  - `passed_equal = true`
-  - `route_completed_equal = true`
-  - `live_first_poi_hit_equal = false`
-  - `live_second_poi_hit_equal = false`
-  - `triggered_spots_equal = true`
-  - `narrated_spots_equal = true`
-  - `latest_spot_name_equal = true`
+- Searched the newest relevant harness/report/log files for:
+  - `UnicodeDecodeError`
+  - `gbk codec`
+  - `Traceback`
+- Result:
+  - no `UnicodeDecodeError` was found in those newest files
+  - the live validation command itself also completed without printing a decode traceback
 
-### `POST /reports/compare/export`
+## Reviewer-Subagent Conclusion
 
-- Returned a fresh export:
-  - `export_id = "20260408T123522Z-latest_comparison_export"`
-  - `comparison_status = "ready"`
-  - `comparison_available = true`
-  - `comparability_status = "comparable"`
-  - `missing_modes = []`
-  - `guardrail_reasons = ["required validation assets match across the latest live and compatibility reports"]`
-- Persisted export paths:
-  - JSON:
-    - `D:\\Vibe Coding Projects\\Odin-Nav-Stack-LocalLLM\\session_logs\\mvsim_validation_harness\\comparison_exports\\20260408T123522Z-latest_comparison_export.json`
-  - human-readable markdown:
-    - `D:\\Vibe Coding Projects\\Odin-Nav-Stack-LocalLLM\\session_logs\\mvsim_validation_harness\\comparison_exports\\20260408T123522Z-latest_comparison_export.md`
+- Initial reviewer result: `REWORK`
+- Reason:
+  - Round 049 result handoff had not yet been written to `coordination/latest_result.md`
+  - reviewer also flagged commit-scope caution around `coordination/latest_prompt.md`, which is being treated as pre-existing owner-side round-definition state rather than an executor-round implementation artifact
+- Final reviewer result:
+  - `PASS`
+  - requirements satisfied after the result handoff was completed
+  - no remaining out-of-scope issue in the final executor deliverable
 
-## Fresh Compatibility Report
+## Pass / Outcome
 
-- Fresh `compatibility_shim` report written: yes
-- Path:
-  - `D:\\Vibe Coding Projects\\Odin-Nav-Stack-LocalLLM\\session_logs\\mvsim_validation_harness\\reports\\20260408T123521Z-compatibility_shim.json`
-
-## Latest Comparison Export Truth
-
-- It no longer says `missing_reports`.
-- It now reports a real comparison:
-  - `comparison_status = "ready"`
-  - `comparison_available = true`
-  - `comparability_status = "comparable"`
-
-## Direct Comparability Result
-
-- Reports were: `comparable`
-- Key guardrail reasons:
-  - `required validation assets match across the latest live and compatibility reports`
-- Critical mismatches: none
-- Warnings: none
-
-## What Changed
-
-- No product code changed.
-- No docs changed.
-- Only `coordination/latest_result.md` was updated with the truthful Round 048 result.
-
-## Round Outcome
-
-- This round ended in:
-  - `compatibility_comparison_closed`
-
-## Validation Performed
-
-- Confirmed the current live probe still reports the WSL runtime as available.
-- Ran one fresh `compatibility_shim` harness validation on the current isolated harness stack.
-- Confirmed that a new compatibility report was persisted.
-- Re-read latest, recent, comparison, and comparison export surfaces after that run.
-- Confirmed that the latest comparison/export path now closes with a real live-vs-compatibility comparison.
-
-## Git Status
-
-- Branch: `main`
-- Current `git status --short --branch`:
-
-```text
-## main...origin/main
- M coordination/latest_prompt.md
- M coordination/latest_result.md
- M docs/DEV_WORKFLOW.md
- M docs/MVSIM_LIVE_RUNTIME_BRINGUP.md
-?? coordination/archive/round-044-prompt.md
-?? coordination/archive/round-044-result.md
-?? coordination/archive/round-045-prompt.md
-?? coordination/archive/round-045-result.md
-?? coordination/archive/round-046-prompt.md
-?? coordination/archive/round-046-result.md
-?? coordination/archive/round-047-prompt.md
-?? coordination/archive/round-047-result.md
-?? requirements-dev.txt
-```
-
-- Current HEAD commit: `5f6126e5f0f86515b9e225132bd956d3583425ab`
-- Files staged: no
-- Files committed in this round: no
-- Files pushed in this round: no
+- Passed: yes
+- Round outcome:
+  - `windows_wsl_decode_cleanup_completed`
 
 ## Acceptance Criteria Check
 
-- the round runs a fresh `compatibility_shim` harness validation or records the exact blocker: yes
-- a fresh compatibility report is written, or the exact reason it was not is recorded: yes
-- the latest comparison/export surfaces are re-read after that compatibility attempt: yes
-- the round determines whether live and compatibility reports are directly comparable under current guardrails: yes
-- the round records the truthful comparison result or the exact narrow blocker: yes
+- the round identifies the concrete Windows-side WSL subprocess decode seam: yes
+- the round applies the smallest safe fix in that seam: yes
+- the relevant validation path no longer emits the observed `UnicodeDecodeError`, or the exact remaining case is recorded: yes
+- `python scripts/print_mvsim_live_probe.py --config configs/sim_harness.yaml` still works after the change: yes
+- at least one representative harness or live-runtime validation check still works after the change: yes
 
-## Blockers / Risks / Remaining Gaps
+## Remaining Issues / Risks
 
-- No narrow blocker prevented compatibility validation or comparison closure in this round.
-- The comparison is now closed, but the difference flags still correctly show that `live_first_poi_hit_equal` and `live_second_poi_hit_equal` are `false`, because the compatibility run is not a live-runtime pose-relay run.
-- The worktree still contains unrelated owner-side modified / untracked files from prior rounds and was not committed in this executor round.
+- `errors="replace"` is intentionally tolerant and can hide individual malformed bytes in future WSL output; this is acceptable for robustness, but it is still a visibility tradeoff.
+- `coordination/latest_prompt.md` was already carrying the Round 049 owner prompt in the working tree and is being left as owner-side coordination state rather than treated as the executor’s implementation change.
 
-## Coordination Update
+## Human Input Needed
 
-- The live-vs-compatibility comparison/export closure is now complete on this PC.
-- The next narrow step, if any, should only be taken if the owner wants to clean up the residual Windows-side subprocess decoding risk noted in Round 047 or package/commit the already-verified environment state.
+- No
+
+## Next Narrow Step
+
+- If the owner wants a follow-up cleanup round, the next narrow step should be to centralize the WSL subprocess decoding policy in one local helper so future WSL call sites cannot drift back to Windows default decoding.
+
+## Validation Performed
+
+- Unit-tested the harness module.
+- Re-ran the live-runtime probe.
+- Re-ran a real live-runtime validation path through `MVSimValidationHarnessRuntime`.
+- Re-checked the newest harness/report/log artifacts for decode-related errors.
+
+## Git Delivery Status
+
+- Branch: `main`
+- Round implementation commit:
+  - `a66e61ba892599f6b2a00d0048ce6641208e91f7`
+- Round implementation commit message:
+  - `fix: harden WSL subprocess decoding on Windows`
+- Round implementation push successful:
+  - yes
+- Current worktree after the implementation push and before committing this result file:
+  - `M coordination/latest_prompt.md`
+  - `M coordination/latest_result.md`
+- Files staged: no
+- Files committed in this round:
+  - yes, implementation commit pushed
+- Files pushed in this round:
+  - yes, implementation commit pushed to `origin/main`
